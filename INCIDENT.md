@@ -164,6 +164,15 @@ Unterverzeichnis meldete `wp core verify-checksums` eine Abweichung bei
 `index.php`. Das war die eigene Anpassung des `require`-Pfads, kein Schadcode —
 vor dem Überschreiben mit `wp core download --force` bewahrt.
 
+Daraus folgt eine Aenderung an den Werkzeugen: Bei diesem Layout ist der Loader
+im Webroot **immer** veraendert, die Pruefsumme kann dort nie stimmen. Statt die
+Meldung pauschal zu unterdruecken (was echten Schadcode an derselben Stelle
+verdeckt haette), laufen die Pruefsummen jetzt gegen das
+Installationsverzeichnis, und der Loader wird inhaltlich bewertet: Ein Loader
+besteht aus zwei Anweisungen. Alles darueber hinaus — nachgeladener Code,
+Weiterleitungen, abweichende Include-Ziele, mehr als 15 Zeilen — ist ein
+Befund.
+
 **Mailversand unauffällig.** `mailq` leer, keine Hinweise auf Missbrauch als
 Spam-Relais.
 

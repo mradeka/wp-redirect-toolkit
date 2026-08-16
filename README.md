@@ -151,8 +151,23 @@ Rückgabewert 0 = sauber, 1 = Funde. Als wöchentliche Kontrolle:
 0 6 * * 1 /usr/local/bin/wp-cron-audit --quiet
 ```
 
-Ein modifiziertes `index.php` bei Unterverzeichnis-Installationen wird als
-erwartete Abweichung erkannt und nicht gemeldet.
+**Zur `index.php` bei Unterverzeichnis-Installationen:** Der Loader im Webroot
+ist dort *immer* angepasst — der `require`-Pfad zeigt auf das Kernverzeichnis.
+Die Prüfsumme kann also nie stimmen, und eine Warnung darüber wäre reines
+Rauschen. Deshalb laufen die Prüfsummen gegen das **Installationsverzeichnis**,
+und der Loader wird stattdessen inhaltlich bewertet. Als Befund gilt:
+
+- verschleiernde oder ausführende Konstrukte (`eval`, `base64_decode`,
+  `shell_exec`, `preg_replace` mit `/e`, …)
+- Nachladen aus dem Netz (`file_get_contents("https://…")`, `curl_exec`,
+  `fsockopen`)
+- eine `header("Location: …")`-Weiterleitung
+- `include`/`require` auf etwas anderes als `wp-blog-header.php`,
+  `wp-load.php` oder `wp-settings.php`
+- mehr als 15 Zeilen Code oder über 2 KB — ein Loader hat zwei Anweisungen
+
+Ein sauberer Loader wird als solcher gemeldet, mit dem Hinweis, dass die
+Prüfsummenabweichung dort normal ist.
 
 ### wp-cron-list
 
@@ -357,6 +372,7 @@ Geprüft wird:
 | Protokollmarker | `"//https:` in einem String — so schreibt kein Entwickler eine URL |
 | Landeseiten | `.htm`/`.html` mit Meta-Refresh oder `location`, Dateinamen mit „coming soon" |
 | PHP an falscher Stelle | `uploads/`, `cache/`, `languages/` |
+| `index.php`-Loader | inhaltlich statt per Prüfsumme — siehe unten |
 
 Zwei Stufen: **TREFFER** (eine Domain der Sperrliste kommt vor, mit `--apply`
 entfernbar) und **VERDACHT** (Weiterleitungsmuster ohne bekannte Domain, wird

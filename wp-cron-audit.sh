@@ -127,19 +127,51 @@ for CONFIG in "${CONFIGS[@]}"; do
 
     # ---- 4. integrity ------------------------------------------------------
     sec "Core integrity"
+    # Bei Unterverzeichnis-Installationen ("WordPress in eigenem Verzeichnis")
+    # ist die index.php im Webroot IMMER angepasst - der require-Pfad zeigt auf
+    # das Kernverzeichnis. Die Pruefsumme kann dort also nie stimmen, und eine
+    # Warnung darueber ist reines Rauschen. Richtig ist:
+    #   a) Pruefsummen gegen das INSTALLATIONSVERZEICHNIS laufen lassen
+    #   b) den Loader im Webroot separat auf Kaperungsmuster pruefen
     CK=$($WP core verify-checksums 2>&1 | grep -v '^Success')
-    if [[ -z "$CK" ]]; then
-      ok "core verifies"
-    else
-      # a modified root index.php is EXPECTED when core lives in a subdirectory
-      if echo "$CK" | grep -q "index.php" && [[ -f "$(dirname "$WP_PATH")/index.php" || "$(basename "$WP_PATH")" != "public_html" ]]; then
-        note "  index.php differs - normal for a subdirectory install (loader path)"
-        REST_CK=$(echo "$CK" | grep -v 'index.php' | grep -v "doesn't verify against checksums")
-        [[ -n "$REST_CK" ]] && bad "core files modified: $(echo "$REST_CK" | tr '\n' ' ')"
-      else
-        bad "core checksum mismatch: $(echo "$CK" | head -3 | tr '\n' ' ')"
+    CK_REST=$(echo "$CK" | grep -viE "index\.php|doesn't verify against checksums" | grep -v '^$')
+    [[ -z "$CK_REST" ]] && ok "core verifies (Installationsverzeichnis)" \
+                        || bad "core files modified: $(echo "$CK_REST" | head -3 | tr '\n' ' ')"
+
+    # Kandidaten fuer den Loader: Webroot oberhalb des Kerns, und der Kern selbst
+    PARENT=$(dirname "$WP_PATH")
+    for IDX in "${PARENT}/index.php" "${WP_PATH}/index.php"; do
+      [[ -f "$IDX" ]] || continue
+      # nur pruefen, wenn die Datei ueberhaupt vom Original abweicht
+      echo "$CK" | grep -q 'index.php' || [[ "$IDX" == "${PARENT}/index.php" ]] || continue
+
+      # Code ohne Kommentare und Leerzeilen
+      BODY=$(sed -E 's://.*$::; s:/\*.*\*/::' "$IDX" | grep -vE '^\s*(\*|/\*|\*/)?\s*$' | grep -v '^\s*#')
+      LINES=$(echo "$BODY" | grep -cve '^\s*$')
+      SIZE=$(stat -c%s "$IDX")
+
+      # Muster, die in einem Loader nichts zu suchen haben
+      DANGER=$(echo "$BODY" | grep -inE \
+        'eval\(|base64_decode|gzinflate|gzuncompress|str_rot13|assert\(|create_function|\\x[0-9a-f]{2}|preg_replace\s*\(\s*["'"'"'].*/e|system\(|exec\(|shell_exec|passthru|popen|proc_open|file_get_contents\s*\(\s*["'"'"']https?:|curl_exec|fsockopen|header\s*\(\s*["'"'"']\s*Location|\$_(GET|POST|REQUEST|COOKIE|SERVER\[.HTTP_)|include\s*\(?\s*["'"'"']https?:|auto_prepend' \
+        | head -5)
+
+      if [[ -n "$DANGER" ]]; then
+        bad "index.php enthaelt untypische Konstrukte: ${IDX}"
+        echo "$DANGER" | sed 's/^/          /'
+      elif [[ "$LINES" -gt 15 || "$SIZE" -gt 2048 ]]; then
+        bad "index.php ist fuer einen Loader zu umfangreich (${LINES} Zeilen, ${SIZE} Bytes): ${IDX}"
+        echo "$BODY" | head -8 | sed 's/^/          /'
+      elif echo "$BODY" | grep -qE "require|include"; then
+        REQ=$(echo "$BODY" | grep -oE "(require|include)(_once)?[^;]*wp-blog-header\.php" | head -1)
+        if [[ -n "$REQ" ]]; then
+          note "  index.php ist ein Loader (${LINES} Zeilen) -> ${REQ}"
+          note "  Abweichung von der Pruefsumme ist hier normal und kein Befund."
+        else
+          bad "index.php laedt etwas anderes als wp-blog-header.php: ${IDX}"
+          echo "$BODY" | grep -E 'require|include' | head -3 | sed 's/^/          /'
+        fi
       fi
-    fi
+    done
   fi
 
   # ---- 5. filesystem (does not need WP-CLI) --------------------------------

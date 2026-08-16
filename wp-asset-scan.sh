@@ -168,6 +168,42 @@ for ROOT in "${ROOTS[@]}"; do
   [[ $PHP_HIT -eq 0 ]] && ok "kein PHP in uploads/cache/languages"
 
   # -------------------------------------------------------------------------
+  # 3b. index.php im Webroot (Loader bei Unterverzeichnis-Installationen)
+  # -------------------------------------------------------------------------
+  printf '  index.php (Loader)\n'
+  IDX_HIT=0
+  for IDX in "${ROOT}/index.php" "${ROOT}"/*/index.php; do
+    [[ -f "$IDX" ]] || continue
+    # nur Dateien betrachten, die wie ein Loader aussehen sollen: Webroot oder
+    # direkt darunter. Tiefer liegende index.php gehoeren zu Themes/Plugins.
+    BODY=$(sed -E 's://.*$::; s:/\*.*\*/::' "$IDX" 2>/dev/null | grep -vE '^\s*(\*|/\*|\*/)?\s*$' | grep -v '^\s*#')
+    LINES=$(echo "$BODY" | grep -cve '^\s*$')
+    SIZE=$(stat -c%s "$IDX")
+    # Eine index.php mit viel Code ist kein Loader - das ist normal fuer
+    # den WordPress-Kern selbst, deshalb hier nur kleine Dateien bewerten.
+    [[ "$LINES" -gt 60 ]] && continue
+
+    DANGER=$(echo "$BODY" | grep -inE \
+      'eval\(|base64_decode|gzinflate|gzuncompress|str_rot13|assert\(|create_function|preg_replace\s*\(\s*["'"'"'].*/e|system\(|exec\(|shell_exec|passthru|popen|proc_open|file_get_contents\s*\(\s*["'"'"']https?:|curl_exec|fsockopen|header\s*\(\s*["'"'"']\s*Location|include\s*\(?\s*["'"'"']https?:|auto_prepend' \
+      | head -5)
+
+    if [[ -n "$DANGER" ]]; then
+      bad "index.php mit untypischen Konstrukten: $IDX"
+      echo "$DANGER" | sed 's/^/             /'
+      IDX_HIT=$((IDX_HIT+1)); TOTAL_HIT=$((TOTAL_HIT+1))
+    elif echo "$BODY" | grep -qE 'require|include'; then
+      if ! echo "$BODY" | grep -qE '(require|include)(_once)?[^;]*wp-(blog-header|load|settings)\.php'; then
+        bad "index.php bindet etwas anderes als den WordPress-Kern ein: $IDX"
+        echo "$BODY" | grep -E 'require|include' | head -3 | sed 's/^/             /'
+        IDX_HIT=$((IDX_HIT+1)); TOTAL_HIT=$((TOTAL_HIT+1))
+      elif [[ "$LINES" -le 15 ]]; then
+        printf '    ok: %s ist ein Loader (%d Zeilen) - Pruefsummenabweichung hier normal\n' "$IDX" "$LINES"
+      fi
+    fi
+  done
+  [[ $IDX_HIT -eq 0 ]] && ok "keine auffaellige index.php"
+
+  # -------------------------------------------------------------------------
   # 4. Theme-Assets, die aus der Datenbank neu erzeugt werden
   # -------------------------------------------------------------------------
   MERGED=$(find "$ROOT" -path '*uploads/dynamic_avia/*' -o -path '*cache/autoptimize/*' \
