@@ -1,0 +1,9 @@
+# Niemals einchecken: enthaelt Klartext-Zugangsdaten
+wp-db-credentials.txt
+*.sql
+*.sql.gz
+wp-config*.php
+wp-cleanup-logs/
+*.tar.gz
+*.zip
+*.phar

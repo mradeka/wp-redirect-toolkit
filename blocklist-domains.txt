@@ -1,0 +1,34 @@
+# Domains der Weiterleitungskampagne (Stand August 2026)
+#
+# Quellen:
+#   - eigener Vorfall August 2026: urshort.com, ushort.company, ushort.org
+#   - Sal Aguilar / WPSecurityAnalyzer, Mai 2026 (dieselbe Kampagne):
+#     ushort.observer, ushort.info, u-short.net, urshort.live, ushort.today,
+#     ushort.com, ushort.dev
+#
+# Eine Zeile pro Domain, Kommentare mit #. Zum Einlesen in Firewalls,
+# DNS-Sperrlisten oder Suchskripte gedacht.
+#
+# HINWEIS zu ushort.com: kurze, generische Domains wechseln den Besitzer.
+# Vor dem Sperren prüfen, sonst blockierst du unter Umständen einen
+# legitimen Kurz-URL-Dienst und merkst es erst spät.
+
+u-short.net
+urshort.com
+urshort.live
+ushort.com
+ushort.company
+ushort.dev
+ushort.info
+ushort.observer
+ushort.org
+ushort.today
+
+# Pfadmuster der Kampagne: /[A-Za-z0-9]{10} mit angehaengter Kennung
+#   0r2, 0r3, 0r4, 0r5  - offenbar die Nummer der Angriffswelle
+#
+# Weitere Marker (keine Domains, nicht zum Sperren):
+#   <meta http-equiv="refresh" content="7; url=https://<domain>/<token>"
+#   window.location.href = "//https://<domain>/<token>";   (am Ende von JS-Dateien)
+#   gefaelschte "Coming soon"-Seiten als .htm, .html, .php
+#   WP-Cron-Hooks mit Zufallsnamen (12+ Zeichen, Buchstaben und Ziffern)
