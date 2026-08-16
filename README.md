@@ -379,7 +379,7 @@ Geprüft wird:
 | JS-Injektion | nur die letzten 800 Bytes jeder `.js` — dort sitzt der angehängte Code, auch bei minifizierten Dateien |
 | Protokollmarker | `"//https:` in einem String — so schreibt kein Entwickler eine URL |
 | Landeseiten | `.htm`/`.html` mit Meta-Refresh oder `location`, Dateinamen mit „coming soon" |
-| PHP an falscher Stelle | `uploads/`, `cache/`, `languages/` |
+| PHP an falscher Stelle | `uploads/`, `cache/`, `languages/` — Übersetzungsdateien (`*.l10n.php`) ausgenommen |
 | `index.php`-Loader | inhaltlich statt per Prüfsumme — siehe unten |
 | Prüfsummen | Kern, Plugins und Themes; nicht prüfbare Erweiterungen werden benannt |
 | mu-plugins | werden immer geladen, beliebtes Versteck |
@@ -409,6 +409,13 @@ und der Loader wird stattdessen inhaltlich bewertet. Als Befund gilt:
 
 Ein sauberer Loader wird als solcher gemeldet, mit dem Hinweis, dass die
 Prüfsummenabweichung dort normal ist.
+
+**Zu Übersetzungsdateien:** Seit WordPress 6.5 liegen Sprachpakete zusätzlich
+als PHP-Dateien (`*.l10n.php`) unter `wp-content/languages/` — das ist legitim
+und lädt schneller als die alten `.mo`-Dateien. Sie werden von der Prüfung
+ausgenommen, ebenso andere Dateien dort, die nur ein `return [...]`-Array
+enthalten. Eine PHP-Datei unter `languages/`, die tatsächlich Code ausführt,
+wird weiterhin gemeldet.
 
 **Zur Verschleierungssuche:** Ein Grep auf `eval`, `base64_decode` oder
 `gzinflate` allein erzeugt Fehlalarme — der WordPress-Kern selbst enthält

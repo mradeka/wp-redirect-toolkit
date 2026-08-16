@@ -182,15 +182,26 @@ for ROOT in "${ROOTS[@]}"; do
 
   # -------------------------------------------------------------------------
   # 3. PHP ausserhalb der ueblichen Pfade
+  #    Seit WordPress 6.5 liegen Uebersetzungen zusaetzlich als PHP-Dateien
+  #    (*.l10n.php) unter wp-content/languages - das ist legitim und deutlich
+  #    schneller als die alten .mo-Dateien. Solche Dateien werden ausgenommen.
   # -------------------------------------------------------------------------
   printf '  PHP an untypischen Orten\n'
   PHP_HIT=0
   while IFS= read -r -d '' F; do
+    case "$F" in
+      *.l10n.php) continue ;;                  # Uebersetzungsdatei
+      */languages/*.php)
+        # andere PHP-Dateien unter languages/ nur melden, wenn sie Code
+        # ausfuehren statt nur ein Array zurueckzugeben
+        head -c 200 "$F" | grep -qE '^\s*<\?php\s+return\s*\[' && continue
+        ;;
+    esac
     bad "PHP: $F  ($(stat -c '%y' "$F" | cut -c1-16))"
     PHP_HIT=$((PHP_HIT+1)); TOTAL_HIT=$((TOTAL_HIT+1))
   done < <(find "$ROOT" \( -path '*/wp-content/uploads/*' -o -path '*/wp-content/cache/*' \
                           -o -path '*/wp-content/languages/*' \) -name '*.php' -print0 2>/dev/null)
-  [[ $PHP_HIT -eq 0 ]] && ok "kein PHP in uploads/cache/languages"
+  [[ $PHP_HIT -eq 0 ]] && ok "kein unerwartetes PHP in uploads/cache/languages"
 
   # -------------------------------------------------------------------------
   # 3b. index.php im Webroot (Loader bei Unterverzeichnis-Installationen)
