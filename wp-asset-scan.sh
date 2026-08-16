@@ -2,7 +2,14 @@
 #
 # wp-asset-scan.sh
 #
-# Sucht die DATEIBASIERTEN Infektionswege derselben Kampagne, die die
+# Prueft alles, was im DATEISYSTEM liegt. Gegenstueck zu wp-db-audit, das die
+# Datenbank prueft - die Aufteilung folgt der Datenquelle, nicht dem Thema.
+#
+# Umfang: JS-Injektionen, gefaelschte Landeseiten, PHP an untypischen Orten,
+# index.php-Loader, mu-plugins, Verschleierungsmuster, auto_prepend, Dumps im
+# Webverzeichnis sowie die Pruefsummen von Kern, Plugins und Themes.
+#
+# Die kampagnenspezifischen Muster stammen aus der Analyse, die die
 # uebrigen Werkzeuge nicht abdecken. Laut der Analyse von Sal Aguilar
 # (WPSecurityAnalyzer, Mai 2026) verbreitet sie sich zusaetzlich ueber:
 #
@@ -151,9 +158,27 @@ for ROOT in "${ROOTS[@]}"; do
   done < <(find "$ROOT" -type f \( -name '*.htm' -o -name '*.html' \) -print0 2>/dev/null)
   [[ $HTML_HIT -eq 0 ]] && ok "keine auffaelligen HTML-Dateien"
 
-  # Dateinamen der Kampagne
-  COMING=$(find "$ROOT" -type f -iname '*coming*soon*' -o -type f -iname '*under*construction*' 2>/dev/null | head -10)
-  [[ -n "$COMING" ]] && { echo "$COMING" | while read -r F; do bad "Landeseite: $F"; done; TOTAL_HIT=$((TOTAL_HIT+1)); }
+  # Dateinamen der Kampagne. Wichtig: das Standardtheme bringt selbst ein
+  # Muster "page-coming-soon.php" samt Hintergrundbild mit - deshalb werden
+  # Theme- und Plugin-Verzeichnisse ausgenommen und nur Dateien gemeldet, die
+  # tatsaechlich eine Weiterleitung enthalten.
+  COMING=$(find "$ROOT" -maxdepth 3 -type f \
+             \( -iname '*coming*soon*' -o -iname '*under*construction*' \) \
+             ! -path '*/wp-content/themes/*' ! -path '*/wp-content/plugins/*' \
+             ! -path '*/wp-includes/*' ! -path '*/wp-admin/*' \
+             \( -name '*.php' -o -name '*.htm' -o -name '*.html' \) 2>/dev/null | head -10)
+  if [[ -n "$COMING" ]]; then
+    while read -r F; do
+      [[ -z "$F" ]] && continue
+      if head -c 4000 "$F" | grep -qiE 'http-equiv=["'"'"']?refresh|location\.(replace|href)|header\s*\(\s*["'"'"']\s*Location'; then
+        bad "Landeseite mit Weiterleitung: $F"
+        TOTAL_HIT=$((TOTAL_HIT+1))
+      else
+        warn "Datei heisst wie eine Landeseite, enthaelt aber keine Weiterleitung: $F"
+        TOTAL_SUS=$((TOTAL_SUS+1))
+      fi
+    done <<< "$COMING"
+  fi
 
   # -------------------------------------------------------------------------
   # 3. PHP ausserhalb der ueblichen Pfade
@@ -204,7 +229,92 @@ for ROOT in "${ROOTS[@]}"; do
   [[ $IDX_HIT -eq 0 ]] && ok "keine auffaellige index.php"
 
   # -------------------------------------------------------------------------
-  # 4. Theme-Assets, die aus der Datenbank neu erzeugt werden
+  # 5. Weitere Dateibefunde (aus wp-db-audit hierher verschoben - alles, was
+  #    im Dateisystem liegt, gehoert in dieses Skript)
+  # -------------------------------------------------------------------------
+  printf '  Weitere Dateipruefungen\n'
+  MISC=0
+
+  if [[ -d "${ROOT}/wp-content/mu-plugins" ]]; then
+    MU=$(find "${ROOT}/wp-content/mu-plugins" -name '*.php' 2>/dev/null | head -5)
+    [[ -n "$MU" ]] && { bad "mu-plugins vorhanden (werden immer geladen): $(echo "$MU" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+  fi
+
+  OBF=$(grep -rlE 'eval\(|base64_decode|gzinflate|str_rot13|assert\(|\bcreate_function\b' \
+        "${ROOT}" --include='*.php' 2>/dev/null | head -5)
+  [[ -n "$OBF" ]] && { bad "Verschleierungsmuster: $(echo "$OBF" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+
+  PREP=$(grep -rn 'auto_prepend_file\|auto_append_file' \
+         "${ROOT}/.htaccess" "${ROOT}/.user.ini" "${ROOT}/php.ini" 2>/dev/null | head -3)
+  [[ -n "$PREP" ]] && { bad "auto_prepend/append: $(echo "$PREP" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+
+  DUMPS=$(find "$ROOT" -maxdepth 3 \
+          \( -name '*.sql' -o -name '*.sql.gz' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.phar' \) \
+          -type f 2>/dev/null | head -5)
+  [[ -n "$DUMPS" ]] && { bad "Dumps/Archive im Webverzeichnis (enthalten Passwort-Hashes): $(echo "$DUMPS" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+
+  RECENT=$(find "$ROOT" -name '*.php' -mtime -7 -type f 2>/dev/null | head -10)
+  if [[ -n "$RECENT" ]]; then
+    printf '    PHP-Dateien der letzten 7 Tage (gegen eigene Arbeit abgleichen):\n'
+    echo "$RECENT" | while read -r f; do printf '      %s\n' "$(stat -c '%y %n' "$f" | cut -c1-16,21-)"; done
+  fi
+  [[ $MISC -eq 0 ]] && ok "keine weiteren Dateibefunde"
+
+  # -------------------------------------------------------------------------
+  # 6. Pruefsummen - braucht WP-CLI, deshalb erst hier
+  # -------------------------------------------------------------------------
+  WPDIR=""
+  for CAND in "$ROOT" "$ROOT"/wordpress "$ROOT"/wp; do
+    [[ -f "${CAND}/wp-config.php" ]] && { WPDIR="$CAND"; break; }
+  done
+  if [[ -n "$WPDIR" ]]; then
+    OWNER=$(stat -c '%U' "${WPDIR}/wp-config.php")
+    WPBIN=""
+    for CAND in "/home/${OWNER}/wp" "/home/${OWNER}/.wp-cli.phar" /usr/local/bin/wp; do
+      sudo -u "$OWNER" -H test -r "$CAND" 2>/dev/null && { WPBIN="$CAND"; break; }
+    done
+    if [[ -n "$WPBIN" ]]; then
+      printf '  Pruefsummen (%s)\n' "$WPDIR"
+      WP="sudo -u ${OWNER} -H ${WPBIN} --path=${WPDIR} --skip-plugins --skip-themes"
+
+      CK=$($WP core verify-checksums 2>&1 | grep -v '^Success')
+      CK_REST=$(echo "$CK" | grep -viE "index\.php|doesn't verify against checksums" | grep -v '^$')
+      [[ -z "$CK_REST" ]] && ok "Kern unveraendert" \
+        || { bad "Kerndateien veraendert: $(echo "$CK_REST" | head -3 | tr '\n' ' ')"; TOTAL_HIT=$((TOTAL_HIT+1)); }
+
+      for KIND in plugin theme; do
+        OUT=$($WP "$KIND" verify-checksums --all 2>&1)
+        MOD=$(echo "$OUT" | grep -iE "doesn't verify|should not exist|File was added|File was modified|File doesn't exist" | head -10)
+        if [[ -n "$MOD" ]]; then
+          bad "${KIND}: veraenderte Dateien"
+          echo "$MOD" | head -5 | sed 's/^/             /'
+          TOTAL_HIT=$((TOTAL_HIT+1))
+        else
+          ok "${KIND}: alle pruefbaren Dateien unveraendert"
+        fi
+        UNVERIF=$(echo "$OUT" | grep -i 'could not retrieve' \
+                  | sed -E 's/.*(of|for) [a-z]+ ([A-Za-z0-9_.-]+).*/\2/I' | sort -u | tr '\n' ' ')
+        if [[ -n "${UNVERIF// /}" ]]; then
+          printf '    ohne Pruefsummen (nicht im offiziellen Verzeichnis): %s\n' "$UNVERIF"
+          LOW=$(echo "$UNVERIF" | tr '[:upper:]' '[:lower:]')
+          case "$LOW" in
+            *enfold*|*divi*|*avada*|*bridge*|*flatsome*|*woodmart*|*jupiter*|*betheme*|*salient*|*thegem*|*impreza*|*porto*|*x-theme*|*elementor-pro*|*wp-rocket*|*acf-pro*|*gravityforms*|*wpml*|*layerslider*|*revslider*|*slider-revolution*)
+              warn "darunter eine gekaufte Erweiterung - sie wird NICHT geprueft."
+              warn "Bei Verdacht gegen das Original aus dem Kundenkonto vergleichen"
+              warn "(niemals gegen eine Kopie unbekannter Herkunft):"
+              warn "  diff -rq ${WPDIR}/wp-content/${KIND}s/<name>/ /pfad/zum/original/"
+              TOTAL_SUS=$((TOTAL_SUS+1))
+              ;;
+          esac
+        fi
+      done
+    else
+      printf '  Pruefsummen uebersprungen - keine nutzbare WP-CLI fuer %s\n' "$OWNER"
+    fi
+  fi
+
+  # -------------------------------------------------------------------------
+  # 7. Theme-Assets, die aus der Datenbank neu erzeugt werden
   # -------------------------------------------------------------------------
   MERGED=$(find "$ROOT" -path '*uploads/dynamic_avia/*' -o -path '*cache/autoptimize/*' \
                         -o -path '*cache/min/*' 2>/dev/null | head -5)
@@ -224,6 +334,11 @@ cat <<'NEXT'
   Nach dem Bereinigen von JS-Dateien:
     - Theme-Cache und zusammengefuehrte Assets neu erzeugen lassen
     - opcache leeren: systemctl reload php*-fpm
-    - Pruefsummen gegenpruefen: wp plugin verify-checksums --all
-      (eine veraenderte Plugin-Datei zeigt sich dort zuverlaessiger als per grep)
+    - Pruefsummen gegenpruefen - zuverlaessiger als jede Mustersuche:
+        wp plugin verify-checksums --all
+        wp theme  verify-checksums --all
+      Gekaufte Themes (Enfold, Divi, Avada ...) stehen nicht im offiziellen
+      Verzeichnis und werden dabei uebersprungen. Sie muessen bei Verdacht
+      von Hand gegen das Original aus dem Kundenkonto verglichen werden:
+        diff -rq wp-content/themes/<name>/ /pfad/zum/entpackten/original/
 NEXT

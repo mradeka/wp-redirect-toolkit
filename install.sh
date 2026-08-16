@@ -23,7 +23,7 @@ done
 
 # name:mode - the password rotator is 700, it writes cleartext credentials
 SCRIPTS=(
-  "wp-cron-audit:755"
+  "wp-db-audit:755"
   "wp-cron-list:755"
   "wp-user-audit:755"
   "wp-redirect-cleanup:755"
@@ -42,6 +42,12 @@ if [[ $UNINSTALL -eq 1 ]]; then
   done
   echo "Fertig. /root/wp-db-credentials.txt und /root/wp-cleanup-logs bleiben erhalten."
   exit 0
+fi
+
+# Vorgaengername aufraeumen: wp-cron-audit wurde zu wp-db-audit, sonst liegen
+# beide parallel und der alte laeuft weiter.
+if [[ -e "${PREFIX}/wp-cron-audit" ]]; then
+  rm -f "${PREFIX}/wp-cron-audit" && echo "  entfernt: ${PREFIX}/wp-cron-audit (heisst jetzt wp-db-audit)"
 fi
 
 echo "== Installation nach ${PREFIX} =="
@@ -96,7 +102,7 @@ if [[ $FAIL -eq 0 ]]; then
 Installation vollstaendig. Empfohlener Einstieg:
 
   check-usrlocalbin-access     # koennen alle Konten die Werkzeuge nutzen?
-  wp-cron-audit                # Bestandsaufnahme, aendert nichts
+  wp-db-audit                # Bestandsaufnahme, aendert nichts
   wp-cleanup-all               # Trockenlauf ueber alle Seiten
 
 Alles Weitere in README.md, der Vorfallshergang in INCIDENT.md.

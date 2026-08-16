@@ -153,7 +153,7 @@ mkdir -p /root/aus-webroot && chmod 700 /root/aus-webroot
 mv /home/*/public_html/**/*.sql /root/aus-webroot/ 2>/dev/null
 ```
 
-`wp-redirect-cleanup` und `wp-cron-audit` melden solche Funde ohnehin bei
+`wp-redirect-cleanup` und `wp-db-audit` melden solche Funde ohnehin bei
 jedem Lauf — dieser Abschnitt ist die manuelle Variante für den Einstieg.
 
 ---
@@ -165,7 +165,6 @@ jedem Lauf — dieser Abschnitt ist die manuelle Variante für den Einstieg.
 ```bash
 git clone https://github.com/DEIN-NAME/wp-redirect-toolkit.git
 cd wp-redirect-toolkit
-chmod +x install.sh
 sudo ./install.sh
 ```
 
@@ -181,7 +180,7 @@ sudo ./install.sh
 ### Variante C — von Hand
 
 ```bash
-for S in wp-cron-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
+for S in wp-db-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
          wp-cleanup-all wp-move-to-subdir wp-asset-scan \
          check-usrlocalbin-access apply-blocklist; do
   sudo install -m 755 "${S}.sh" "/usr/local/bin/${S}"
@@ -297,7 +296,7 @@ Shell-History mitschreibt — sonst steht es dauerhaft in `~/.bash_history`.
 ## 6. Installation prüfen
 
 ```bash
-for S in wp-cron-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
+for S in wp-db-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
          wp-cleanup-all wp-move-to-subdir wp-asset-scan \
          check-usrlocalbin-access apply-blocklist wp-rotate-db-passwords; do
   printf '%-28s ' "$S"
@@ -311,7 +310,7 @@ Erwartet: neun Skripte mit `-rwxr-xr-x`, `wp-rotate-db-passwords` mit
 Funktionstest ohne Nebenwirkungen:
 
 ```bash
-wp-cron-audit --help
+wp-db-audit --help
 apply-blocklist grep          # gibt das Suchmuster aus
 wp-asset-scan --help
 ```
@@ -324,7 +323,7 @@ Alles unten ist Trockenlauf und ändert nichts.
 
 ```bash
 sudo check-usrlocalbin-access     # 1. sind die Werkzeuge überall nutzbar?
-sudo wp-cron-audit                # 2. Bestandsaufnahme aller Seiten
+sudo wp-db-audit                # 2. Bestandsaufnahme aller Seiten
 sudo wp-asset-scan                # 3. Dateisystem: JS, Landeseiten, PHP
 sudo wp-cleanup-all               # 4. Trockenlauf der Bereinigung
 ```
@@ -340,13 +339,13 @@ wechseln.** Andersherum sperrst du nur dich selbst aus.
 
 ## 8. Regelmäßige Kontrolle einrichten
 
-`wp-cron-audit` gibt 0 zurück, wenn alles sauber ist, und 1 bei Funden — als
+`wp-db-audit` gibt 0 zurück, wenn alles sauber ist, und 1 bei Funden — als
 cron-Eintrag meldet es sich also nur, wenn es etwas zu melden gibt:
 
 ```cron
 # /etc/cron.d/wp-toolkit
 MAILTO=admin@example.tld
-0 6 * * 1 root /usr/local/bin/wp-cron-audit --quiet
+0 6 * * 1 root /usr/local/bin/wp-db-audit --quiet
 30 6 * * 1 root /usr/local/bin/wp-asset-scan
 ```
 
@@ -432,5 +431,5 @@ Die Skripte sind eigenständig lauffähig — du kannst jedes einzeln aus dem
 entpackten Verzeichnis starten, ohne es zu installieren:
 
 ```bash
-bash ./wp-cron-audit.sh
+bash ./wp-db-audit.sh
 ```
