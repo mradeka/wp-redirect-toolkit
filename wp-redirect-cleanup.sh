@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# wp-redirect-cleanup.sh   (v6)
+# wp-redirect-cleanup.sh   (v7)
 #
 # Scans and cleans a WordPress install infected with a database-injected
 # redirect payload of the form:
@@ -26,6 +26,7 @@
 # (disposable types). Rows that afterwards only mention the domain as a bare
 # URL inside real text are reported, never touched.
 #
+# v7: Abbruch statt Blindflug, wenn home UND siteurl dieselbe Domain tragen
 # v6: fourth pass for cached oEmbed markup; empty posts/pages go to the trash
 # v5: --domain/--url auto-detected; usable unattended from wp-cleanup-all.sh
 # v4: third pass + automatic wp-config.php chmod + guid repair
@@ -130,6 +131,44 @@ if [[ -z "$BAD_DOMAIN" || "$BAD_DOMAIN" == "auto" ]]; then
 fi
 echo "domain  : ${BAD_DOMAIN}"
 
+# Guard: if the detected domain is the site's own, detection went wrong and
+# every later step would treat clean values as hijacked. Better to stop than
+# to "repair" a correct siteurl into something broken.
+S_CHK=$($WP option get siteurl 2>/dev/null); H_CHK=$($WP option get home 2>/dev/null)
+SH_CHK=$(echo "$S_CHK" | sed -E 's#^https?://(www\.)?##; s#/.*##')
+HH_CHK=$(echo "$H_CHK" | sed -E 's#^https?://(www\.)?##; s#/.*##')
+if [[ -n "$BAD_DOMAIN" && "$BAD_DOMAIN" != "__none__" ]]; then
+  BD_CHK=$(echo "$BAD_DOMAIN" | sed -E 's#^www\.##')
+  if [[ "$SH_CHK" == *"$BD_CHK"* && "$HH_CHK" == *"$BD_CHK"* ]]; then
+    if [[ -n "$SITE_URL" && -n "$SITE_URL_CORE" ]]; then
+      # Werte wurden explizit uebergeben - dann ist nichts abzuleiten und der
+      # Lauf kann weitergehen, egal wie die Erkennung ausgegangen ist.
+      warn "home und siteurl enthalten beide '${BAD_DOMAIN}' - es wird mit den"
+      warn "uebergebenen Werten gearbeitet (--url / --siteurl)."
+    else
+      bad "Selbsterkennung nicht verwertbar: '${BAD_DOMAIN}' steckt in home UND siteurl"
+      echo "    home:    ${H_CHK}"
+      echo "    siteurl: ${S_CHK}"
+      echo
+      echo "    Zwei moegliche Ursachen:"
+      echo "      a) beide Optionen sind tatsaechlich gekapert - dann gibt es"
+      echo "         keinen sauberen Wert zum Ableiten"
+      echo "      b) erkannt wurde versehentlich die EIGENE Domain - dann waere"
+      echo "         ein korrekter Wert als gekapert behandelt worden"
+      echo
+      echo "    In beiden Faellen die Werte explizit angeben:"
+      echo "      --domain <schaddomain> --url https://DEINE-DOMAIN.TLD \\"
+      echo "      --siteurl https://DEINE-DOMAIN.TLD[/$(basename "$WP_PATH")]"
+      echo
+      echo "    Schaddomain ermitteln:"
+      echo "      ${WP_BIN} --path=${WP_PATH} db query \"SELECT DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(post_content,'url=',-1),'\\\"',1) FROM ${PREFIX}posts WHERE post_content LIKE '<meta http-equiv=%' LIMIT 5;\""
+      echo "    Oeffentliche Adresse ermitteln:"
+      echo "      grep -rh ServerName /etc/apache2/sites-enabled/ | sort -u"
+      exit 1
+    fi
+  fi
+fi
+
 # The clean one of home/siteurl tells us what the other should be. For a
 # subdirectory install siteurl ends in the core directory name.
 if [[ -z "$SITE_URL" ]]; then
@@ -214,7 +253,14 @@ fix_url_option() {           # $1 option name, $2 current value, $3 intended val
     *"$BAD_DOMAIN"*)
       bad "${opt} hijacked"
       if [[ -z "$want" ]]; then
-        warn "no intended value given - pass --url (and --siteurl for subdir installs)"
+        warn "kein Sollwert bekannt - beide Optionen sind gekapert, es gibt"
+        warn "nichts zum Ableiten. Werte explizit angeben:"
+        echo  "        --url https://DEINE-DOMAIN.TLD \\"
+        echo  "        --siteurl https://DEINE-DOMAIN.TLD[/wordpress]"
+        echo  "    Die oeffentliche Adresse steht im vhost:"
+        echo  "        grep -rh ServerName /etc/apache2/sites-enabled/ | sort -u"
+        echo  "    Bei Unterverzeichnis-Installationen endet --siteurl auf den"
+        echo  "    Verzeichnisnamen ($(basename "$WP_PATH")), --url nicht."
       elif [[ $APPLY -eq 1 ]]; then
         $WP option update "$opt" "$want" >/dev/null && ok "${opt} -> ${want}"
       else
