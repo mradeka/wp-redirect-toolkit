@@ -383,7 +383,7 @@ Geprüft wird:
 | `index.php`-Loader | inhaltlich statt per Prüfsumme — siehe unten |
 | Prüfsummen | Kern, Plugins und Themes; nicht prüfbare Erweiterungen werden benannt |
 | mu-plugins | werden immer geladen, beliebtes Versteck |
-| Verschleierung | `eval`, `base64_decode`, `gzinflate`, `str_rot13`, `assert` |
+| Verschleierung | zweistufig: Ausführung **kombiniert mit** Verschleierung als Befund, einzelne Funktionen nur als Hinweis |
 | `auto_prepend_file` | in `.htaccess`, `.user.ini`, `php.ini` |
 | Dumps und Archive | `.sql`, `.tar.gz`, `.zip`, `.phar` im Webverzeichnis |
 | Änderungsdatum | PHP-Dateien der letzten 7 Tage |
@@ -409,6 +409,21 @@ und der Loader wird stattdessen inhaltlich bewertet. Als Befund gilt:
 
 Ein sauberer Loader wird als solcher gemeldet, mit dem Hinweis, dass die
 Prüfsummenabweichung dort normal ist.
+
+**Zur Verschleierungssuche:** Ein Grep auf `eval`, `base64_decode` oder
+`gzinflate` allein erzeugt Fehlalarme — der WordPress-Kern selbst enthält
+solche Aufrufe. `wp-admin/includes/class-pclzip.php` etwa nutzt
+`gzinflate`/`gzdeflate`, um ZIP-Archive zu entpacken, und trägt ein
+auskommentiertes `eval(` aus alten Versionen. Deshalb:
+
+- **Der Kern wird nicht durchsucht** — er ist durch `wp core verify-checksums`
+  abgedeckt, was zuverlässiger ist als jede Mustersuche. Gesucht wird nur in
+  `wp-content/`.
+- **Befund** ist die *Kombination*: `eval(base64_decode(…))`,
+  `assert($_POST…)`, `preg_replace` mit `/e`-Modifikator, oder ein
+  base64-Blob über 200 Zeichen in einer Dekodierfunktion.
+- **Hinweis** (nur mit `--suspicious`) sind einzelne Funktionen. Caches,
+  Minifier und Importer nutzen sie legitim.
 
 **Zu gekauften Themes und Plugins:** Prüfsummen gibt es nur für Erweiterungen
 aus dem offiziellen WordPress-Verzeichnis. Enfold, Divi, Avada, WP Rocket, ACF

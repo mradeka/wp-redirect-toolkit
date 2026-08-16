@@ -240,9 +240,33 @@ for ROOT in "${ROOTS[@]}"; do
     [[ -n "$MU" ]] && { bad "mu-plugins vorhanden (werden immer geladen): $(echo "$MU" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
   fi
 
-  OBF=$(grep -rlE 'eval\(|base64_decode|gzinflate|str_rot13|assert\(|\bcreate_function\b' \
-        "${ROOT}" --include='*.php' 2>/dev/null | head -5)
-  [[ -n "$OBF" ]] && { bad "Verschleierungsmuster: $(echo "$OBF" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+  # Verschleierung: Der Kern (wp-admin, wp-includes) ist bereits durch die
+  # Pruefsummen abgedeckt und enthaelt legitime Treffer - class-pclzip.php
+  # nutzt gzinflate/gzdeflate zum Ent- und Packen von ZIP-Daten und traegt ein
+  # auskommentiertes eval(. Deshalb hier nur wp-content pruefen und zwischen
+  # starken und schwachen Mustern unterscheiden.
+  OBF_SCOPE="${ROOT}/wp-content"
+  [[ -d "$OBF_SCOPE" ]] || OBF_SCOPE="$ROOT"
+
+  # stark: die Kombination aus Ausfuehrung und Verschleierung, oder
+  # Ausfuehrung direkt aus Benutzereingaben - beides hat in legitimem
+  # Code praktisch nie einen Grund
+  OBF_STRONG=$(grep -rlE \
+    'eval\s*\(\s*(base64_decode|gzinflate|gzuncompress|str_rot13|stripslashes|\$_(GET|POST|REQUEST|COOKIE))|assert\s*\(\s*\$_|preg_replace\s*\(\s*["'"'"'][^"'"'"']*/[a-z]*e[a-z]*["'"'"']|create_function\s*\(.*\$_|\$\{\s*["'"'"']_(GET|POST|REQUEST)|(base64_decode|gzinflate)\s*\(\s*["'"'"'][A-Za-z0-9+/=]{200,}' \
+    "$OBF_SCOPE" --include='*.php' 2>/dev/null | head -5)
+  [[ -n "$OBF_STRONG" ]] && { bad "Verschleierung + Ausfuehrung: $(echo "$OBF_STRONG" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
+
+  # schwach: einzelne Funktionen, die auch legitim vorkommen (Caches,
+  # Minifier, Importer). Nur mit --suspicious anzeigen.
+  if [[ $SHOW_SUSPECT -eq 1 ]]; then
+    OBF_WEAK=$(grep -rlE 'base64_decode|gzinflate|str_rot13|create_function' \
+      "$OBF_SCOPE" --include='*.php' 2>/dev/null | head -10)
+    if [[ -n "$OBF_WEAK" ]]; then
+      warn "einzelne Verschleierungsfunktionen (oft legitim, bitte pruefen):"
+      echo "$OBF_WEAK" | sed 's/^/             /'
+      TOTAL_SUS=$((TOTAL_SUS+1))
+    fi
+  fi
 
   PREP=$(grep -rn 'auto_prepend_file\|auto_append_file' \
          "${ROOT}/.htaccess" "${ROOT}/.user.ini" "${ROOT}/php.ini" 2>/dev/null | head -3)
