@@ -17,15 +17,15 @@ Alle Skripte sind **standardmäßig Trockenlauf** und schreiben nichts, bis
 
 | Skript | Zweck | Ändert etwas? | Als wem ausführen |
 |---|---|---|---|
-| [`wp-cron-audit`](#wp-cron-audit) | Alle Seiten auf Schad-Hooks, Backdoors, Integrität prüfen | nein | root |
+| [`wp-db-audit`](#wp-db-audit) | Datenbank und Konfiguration: Cron-Hooks, Nutzlast, URLs, Konten | nein | root |
+| [`wp-asset-scan`](#wp-asset-scan) | Dateisystem: JS, Landeseiten, Loader, Prüfsummen | nur mit `--apply` | root |
 | [`wp-cron-list`](#wp-cron-list) | WP-Cron-Hooks aller Seiten auflisten, Zufallsnamen markieren | nur mit `--delete` | root |
 | [`wp-user-audit`](#wp-user-audit) | Benutzerkonten bewerten, Auth-Salts erneuern | nur mit `--delete` / `--shuffle-salts` | root |
-| [`wp-redirect-cleanup`](#wp-redirect-cleanup) | Eine Installation bereinigen (v6) | nur mit `--apply` | Seitenbenutzer |
+| [`wp-redirect-cleanup`](#wp-redirect-cleanup) | Eine Installation bereinigen (v7) | nur mit `--apply` | Seitenbenutzer |
 | [`wp-cleanup-all`](#wp-cleanup-all) | Bereinigung über alle Seiten | nur mit `--apply` | root |
 | [`wp-rotate-db-passwords`](#wp-rotate-db-passwords) | Datenbankpasswörter rotieren | nur mit `--apply` | root |
 | [`wp-move-to-subdir`](#wp-move-to-subdir) | Installation nach `public_html/wordpress/` verschieben | nur mit `--apply` | root |
 | [`check-usrlocalbin-access`](#check-usrlocalbin-access) | Prüft, ob jedes Konto die Werkzeuge nutzen kann | nein | root |
-| [`wp-asset-scan`](#wp-asset-scan) | JS-Dateien und Landeseiten auf Injektionen prüfen | nur mit `--apply` | root |
 | [`apply-blocklist`](#apply-blocklist) | Domains der Kampagne sperren oder suchen | nur mit `--apply` | root |
 
 ---
@@ -62,14 +62,13 @@ Voraussetzungen: Bash 4+, WP-CLI 2.7+, MySQL/MariaDB, `curl`, `sudo`.
 ```bash
 git clone https://github.com/DEIN-NAME/wp-redirect-toolkit.git
 cd wp-redirect-toolkit
-chmod +x install.sh
 sudo ./install.sh
 ```
 
 Oder von Hand:
 
 ```bash
-for S in wp-cron-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
+for S in wp-db-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
          wp-cleanup-all wp-move-to-subdir check-usrlocalbin-access; do
   sudo install -m 755 "${S}.sh" "/usr/local/bin/${S}"
 done
@@ -111,7 +110,7 @@ selbst; mit `check-usrlocalbin-access` prüfst du alle Konten auf einmal.
 
 ```
 1. check-usrlocalbin-access      Werkzeuge überall nutzbar?
-2. wp-cron-audit                 Bestandsaufnahme, ändert nichts
+2. wp-db-audit                 Bestandsaufnahme, ändert nichts
 3. wp-asset-scan                 Dateisystem: JS, Landeseiten, PHP
 4. wp-cleanup-all                Trockenlauf über alle Seiten
 5. wp-cleanup-all --apply        Datenbank bereinigen
@@ -120,7 +119,7 @@ selbst; mit `check-usrlocalbin-access` prüfst du alle Konten auf einmal.
 8. wp-rotate-db-passwords --apply
 9. wp-user-audit --shuffle-salts alle Sitzungen ungültig machen
 10. apply-blocklist dnsmasq --apply
-11. wp-cron-audit + wp-asset-scan Kontrolllauf nach 1 h und am Folgetag
+11. wp-db-audit + wp-asset-scan Kontrolllauf nach 1 h und am Folgetag
 ```
 
 Schritt 7 vor 8 und 9 ist entscheidend. Wer die Zugangsdaten wechselt, während
@@ -128,47 +127,55 @@ der Weg hinein offen ist, sperrt nur sich selbst aus.
 
 ---
 
+## Aufteilung der beiden Prüfskripte
+
+Die Trennung folgt der **Datenquelle**, nicht dem Thema:
+
+| | `wp-db-audit` | `wp-asset-scan` |
+|---|---|---|
+| Quelle | Datenbank und WP-Optionen | Dateisystem |
+| Prüft | Cron-Hooks, Nutzlast in `wp_posts`, `home`/`siteurl`, Administratorkonten | JS-Injektionen, Landeseiten, `index.php`-Loader, PHP an falscher Stelle, mu-plugins, Verschleierung, Dumps im Webroot, Prüfsummen von Kern/Plugins/Themes |
+| Ändert etwas | nie | nur `--apply`, und nur JS-Zeilen mit bekannter Domain |
+
+> Frühere Versionen hatten beides in `wp-cron-audit` — der Name versprach Cron
+> und lieferte alles. Das Skript heißt jetzt `wp-db-audit`; `install.sh`
+> entfernt den alten Namen beim Installieren, damit nicht zwei Fassungen
+> nebeneinander liegen.
+
+Beide zusammen ergeben das vollständige Bild. Läuft nur eines, bleibt der
+jeweils andere Infektionsweg unentdeckt.
+
 ## Die Skripte im Einzelnen
 
-### wp-cron-audit
+### wp-db-audit
 
-Rein lesende Bestandsaufnahme aller Installationen.
+Rein lesende Bestandsaufnahme dessen, was in der **Datenbank** und in der
+WordPress-Konfiguration steht. Ändert nie etwas.
 
 ```bash
-sudo wp-cron-audit                  # alle Seiten
-sudo wp-cron-audit --only siteuser   # eine Seite
-sudo wp-cron-audit --quiet          # nur Funde, für cron geeignet
+sudo wp-db-audit                   # alle Seiten
+sudo wp-db-audit --only siteuser   # eine Seite
+sudo wp-db-audit --quiet           # nur Funde, für cron geeignet
 ```
 
-Geprüft wird: Cron-Hooks mit Zufallsnamen, Weiterleitungs-Nutzlast,
-auseinanderlaufende `home`/`siteurl`, Administratorkonten, Kern-Prüfsummen,
-mu-plugins, PHP in `uploads/`, Verschleierungsmuster (`eval`, `base64_decode`,
-…), `auto_prepend_file`-Direktiven, Dumps und Archive im Webverzeichnis sowie
-kürzlich geänderte PHP-Dateien.
+Geprüft wird pro Seite:
+
+| Prüfung | Worauf |
+|---|---|
+| WP-Cron-Hooks | Zufallsnamen (12+ Zeichen, Buchstaben und Ziffern, keine Trennzeichen) — kein Plugin benennt Hooks so |
+| Weiterleitungs-Nutzlast | `post_content`, das mit `<meta http-equiv="refresh"` beginnt, samt Zieldomain |
+| `home` / `siteurl` | zeigen die beiden auf verschiedene Hosts, ist eines davon gekapert |
+| Administratorkonten | Anzahl und Namen; auffällig viele werden gemeldet |
 
 Rückgabewert 0 = sauber, 1 = Funde. Als wöchentliche Kontrolle:
 
 ```cron
-0 6 * * 1 /usr/local/bin/wp-cron-audit --quiet
+0 6 * * 1 /usr/local/bin/wp-db-audit --quiet
 ```
 
-**Zur `index.php` bei Unterverzeichnis-Installationen:** Der Loader im Webroot
-ist dort *immer* angepasst — der `require`-Pfad zeigt auf das Kernverzeichnis.
-Die Prüfsumme kann also nie stimmen, und eine Warnung darüber wäre reines
-Rauschen. Deshalb laufen die Prüfsummen gegen das **Installationsverzeichnis**,
-und der Loader wird stattdessen inhaltlich bewertet. Als Befund gilt:
-
-- verschleiernde oder ausführende Konstrukte (`eval`, `base64_decode`,
-  `shell_exec`, `preg_replace` mit `/e`, …)
-- Nachladen aus dem Netz (`file_get_contents("https://…")`, `curl_exec`,
-  `fsockopen`)
-- eine `header("Location: …")`-Weiterleitung
-- `include`/`require` auf etwas anderes als `wp-blog-header.php`,
-  `wp-load.php` oder `wp-settings.php`
-- mehr als 15 Zeilen Code oder über 2 KB — ein Loader hat zwei Anweisungen
-
-Ein sauberer Loader wird als solcher gemeldet, mit dem Hinweis, dass die
-Prüfsummenabweichung dort normal ist.
+Für das Dateisystem — JS-Injektionen, Landeseiten, Prüfsummen, mu-plugins —
+ist [`wp-asset-scan`](#wp-asset-scan) zuständig. Beide zusammen ergeben das
+vollständige Bild.
 
 ### wp-cron-list
 
@@ -374,10 +381,49 @@ Geprüft wird:
 | Landeseiten | `.htm`/`.html` mit Meta-Refresh oder `location`, Dateinamen mit „coming soon" |
 | PHP an falscher Stelle | `uploads/`, `cache/`, `languages/` |
 | `index.php`-Loader | inhaltlich statt per Prüfsumme — siehe unten |
+| Prüfsummen | Kern, Plugins und Themes; nicht prüfbare Erweiterungen werden benannt |
+| mu-plugins | werden immer geladen, beliebtes Versteck |
+| Verschleierung | `eval`, `base64_decode`, `gzinflate`, `str_rot13`, `assert` |
+| `auto_prepend_file` | in `.htaccess`, `.user.ini`, `php.ini` |
+| Dumps und Archive | `.sql`, `.tar.gz`, `.zip`, `.phar` im Webverzeichnis |
+| Änderungsdatum | PHP-Dateien der letzten 7 Tage |
 
 Zwei Stufen: **TREFFER** (eine Domain der Sperrliste kommt vor, mit `--apply`
 entfernbar) und **VERDACHT** (Weiterleitungsmuster ohne bekannte Domain, wird
 nur gemeldet — legitime Skripte enthalten ebenfalls `location`-Zuweisungen).
+
+**Zur `index.php` bei Unterverzeichnis-Installationen:** Der Loader im Webroot
+ist dort *immer* angepasst — der `require`-Pfad zeigt auf das Kernverzeichnis.
+Die Prüfsumme kann also nie stimmen, und eine Warnung darüber wäre reines
+Rauschen. Deshalb laufen die Prüfsummen gegen das **Installationsverzeichnis**,
+und der Loader wird stattdessen inhaltlich bewertet. Als Befund gilt:
+
+- verschleiernde oder ausführende Konstrukte (`eval`, `base64_decode`,
+  `shell_exec`, `preg_replace` mit `/e`, …)
+- Nachladen aus dem Netz (`file_get_contents("https://…")`, `curl_exec`,
+  `fsockopen`)
+- eine `header("Location: …")`-Weiterleitung
+- `include`/`require` auf etwas anderes als `wp-blog-header.php`,
+  `wp-load.php` oder `wp-settings.php`
+- mehr als 15 Zeilen Code oder über 2 KB — ein Loader hat zwei Anweisungen
+
+Ein sauberer Loader wird als solcher gemeldet, mit dem Hinweis, dass die
+Prüfsummenabweichung dort normal ist.
+
+**Zu gekauften Themes und Plugins:** Prüfsummen gibt es nur für Erweiterungen
+aus dem offiziellen WordPress-Verzeichnis. Enfold, Divi, Avada, WP Rocket, ACF
+Pro und Ähnliches stehen dort nicht — WP-CLI meldet `Could not retrieve the
+checksums` und überspringt sie. Das Skript unterdrückt diese Meldung nicht,
+sondern listet die betroffenen Erweiterungen auf und warnt ausdrücklich, dass
+sie **nicht** geprüft wurden. Bei Verdacht hilft nur der Vergleich gegen das
+Original:
+
+```bash
+diff -rq wp-content/themes/enfold/ /pfad/zum/entpackten/original/enfold/
+```
+
+Das Original dabei aus dem eigenen Kundenkonto laden, niemals aus einer
+Sammelquelle — genau darüber gelangt Schadcode in solche Installationen.
 
 > **Zum Bereinigen von JS:** Entfernt wird gezielt die eingeschleuste
 > Anweisung, nicht die ganze Zeile. Bei minifizierten Dateien steht der
