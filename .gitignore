@@ -4,6 +4,16 @@ wp-db-credentials.txt
 *.sql.gz
 wp-config*.php
 wp-cleanup-logs/
+
+# Archive und Sicherungen
 *.tar.gz
 *.zip
 *.phar
+*.bak
+*.bak-*
+
+# Editor / OS
+.DS_Store
+*~
+.idea/
+.vscode/

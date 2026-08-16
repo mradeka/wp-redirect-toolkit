@@ -73,7 +73,7 @@ mapfile -t CONFIGS < <(
 )
 [[ ${#CONFIGS[@]} -eq 0 ]] && { echo "Keine WordPress-Installationen gefunden."; exit 0; }
 
-declare -A USER_PATHS USER_HOST USER_DB USER_OWNER
+declare -A USER_PATHS USER_HOST USER_DB
 SKIPPED=()
 for CONFIG in "${CONFIGS[@]}"; do
   WP_PATH=$(dirname "$CONFIG")
@@ -105,7 +105,6 @@ for CONFIG in "${CONFIGS[@]}"; do
   USER_PATHS["$DBUSER"]+="${WP_PATH}"$'\n'
   USER_HOST["$DBUSER"]="${DBHOST:-localhost}"
   USER_DB["$DBUSER"]="$DBNAME"
-  USER_OWNER["$DBUSER"]="$SITE_USER"
   printf '  %-24s db=%-24s unix=%-16s %s\n' "$DBUSER" "$DBNAME" "$SITE_USER" "$WP_PATH"
 done
 

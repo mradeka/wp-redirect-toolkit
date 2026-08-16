@@ -52,14 +52,11 @@ echo
 if [[ $ALL -eq 1 ]]; then
   mapfile -t USERS < <(awk -F: '$6 ~ /^\/home\// && $3>=1000 {print $1}' /etc/passwd | sort -u)
 else
-  mapfile -t USERS < <(find /home -maxdepth 4 -name wp-config.php 2>/dev/null \
-                       | xargs -r stat -c '%U' | sort -u)
+  mapfile -t USERS < <(find /home -maxdepth 4 -name wp-config.php \
+                       -exec stat -c '%U' {} + 2>/dev/null | sort -u)
 fi
 if [[ ${#USERS[@]} -eq 0 ]]; then
   echo "Keine Benutzer mit WordPress-Installation gefunden (mit --all alle /home-Konten pruefen)."
-  NOUSERS=1
-else
-  NOUSERS=0
 fi
 
 echo
@@ -68,7 +65,7 @@ echo "== Toolkit-Skripte =="
 # for root themselves and would refuse anyway. Testing them all as a site user
 # would produce false alarms, so they are checked separately.
 USER_SCRIPTS=(wp-redirect-cleanup)
-ROOT_SCRIPTS=(wp-cleanup-all wp-cron-audit wp-cron-list wp-user-audit wp-rotate-db-passwords wp-move-to-subdir)
+ROOT_SCRIPTS=(wp-cleanup-all wp-db-audit wp-cron-list wp-user-audit wp-rotate-db-passwords wp-move-to-subdir)
 
 for S in "${ROOT_SCRIPTS[@]}"; do
   P="/usr/local/bin/${S}"

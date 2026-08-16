@@ -1,0 +1,42 @@
+name: shellcheck
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Syntax check (bash -n)
+        run: |
+          for f in *.sh; do
+            echo "== $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck
+        run: shellcheck -S warning *.sh
+
+      - name: Help output must not error
+        run: |
+          for f in *.sh; do
+            case "$f" in install.sh) continue ;; esac
+            bash "$f" --help > /dev/null
+          done
+
+      - name: Refuse to ship secrets
+        run: |
+          if grep -rInE '(password|passwd|secret)[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'$]{6,}' \
+               --include='*.sh' --include='*.md' . ; then
+            echo "Möglicher hartcodierter Zugangsdatensatz gefunden."
+            exit 1
+          fi
+          echo "keine hartcodierten Zugangsdaten"

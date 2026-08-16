@@ -1,5 +1,9 @@
 # wp-redirect-toolkit
 
+[![shellcheck](https://github.com/DEIN-NAME/wp-redirect-toolkit/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/DEIN-NAME/wp-redirect-toolkit/actions/workflows/shellcheck.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 Werkzeuge zur Analyse und Bereinigung einer WordPress-Kompromittierung, bei der
 eine Weiterleitung **direkt in die Datenbank** geschrieben wurde — ohne
 Veränderung einer einzigen PHP-Datei.
@@ -554,6 +558,15 @@ eigene Sicherung außerhalb des Servers schadet nie.
 
 Bei einer Kompromittierung mit root-Zugriff ist keine Bereinigung vollständig.
 Im Zweifel neu aufsetzen.
+
+## Mitwirken
+
+Rückmeldungen aus echten Vorfällen sind das Wertvollste — besonders
+Fehlalarme und nicht erkannte Varianten. Siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Sicherheitsprobleme **in diesen Skripten** bitte nicht als öffentliches Issue,
+sondern über die private Meldefunktion von GitHub — siehe
+[SECURITY.md](SECURITY.md).
 
 ## Lizenz
 

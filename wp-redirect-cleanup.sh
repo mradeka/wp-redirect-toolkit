@@ -65,7 +65,7 @@ APPLY=0
 BACKUP_DIR="${HOME}/tmp"
 WP_BIN="${WP_BIN:-wp}"
 
-usage() { sed -n '2,50p' "$0"; exit 1; }
+usage() { sed -n '2,50p' "$0"; exit "${1:-1}"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -76,7 +76,7 @@ while [[ $# -gt 0 ]]; do
     --wp-bin)  WP_BIN="$2"; shift 2 ;;
     --backup)  BACKUP_DIR="$2"; shift 2 ;;
     --apply)   APPLY=1; shift ;;
-    -h|--help) usage ;;
+    -h|--help) usage 0 ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
 done

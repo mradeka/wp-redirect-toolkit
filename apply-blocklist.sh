@@ -122,7 +122,7 @@ case "$MODE" in
     else
       echo "${HITS} Datei(en) mit Treffern - Inhalt pruefen, nicht blind loeschen." >&2
     fi
-    echo "Datenbanken zusaetzlich mit wp-cron-audit pruefen." >&2
+    echo "Datenbanken zusaetzlich mit wp-db-audit pruefen." >&2
     ;;
 
   *)

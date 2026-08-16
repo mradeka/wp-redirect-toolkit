@@ -354,7 +354,7 @@ Zwei Konsequenzen fuer die Werkzeuge:
       Notebook?)
 - [ ] Private SSH-Schlüssel vom Server entfernen, Schlüsselpaare erneuern
 - [ ] Passwörter aller Panel-Konten wechseln, nicht nur root
-- [ ] Kontrolllauf `wp-cron-audit` nach einer Stunde und am Folgetag
+- [ ] Kontrolllauf `wp-db-audit` nach einer Stunde und am Folgetag
 
 Steigt die Fundzahl wieder, besteht der Zugang weiter — dann die Seite offline
 nehmen statt erneut zu bereinigen.

@@ -21,7 +21,6 @@
 set -uo pipefail
 
 CLEANUP="${CLEANUP:-/usr/local/bin/wp-redirect-cleanup}"
-ROOT_GLOB="/home/*/public_html"
 APPLY=""
 ONLY=""
 SUMMARY=0
@@ -33,7 +32,7 @@ while [[ $# -gt 0 ]]; do
     --only)    ONLY="$2"; shift 2 ;;
     --summary) SUMMARY=1; shift ;;
     --logdir)  LOGDIR="$2"; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 1 ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -87,12 +86,13 @@ for CONFIG in "${INSTALLS[@]}"; do
 
   LOG="${LOGDIR}/$(echo "${WP_PATH}" | tr '/' '_')-${STAMP}.log"
 
-  sudo -u "$SITE_USER" -H "$CLEANUP" \
+  # Umleitung ausserhalb von sudo: die Logdatei gehoert root, nicht dem
+  # Seitenbenutzer - sonst koennte dieser sie spaeter manipulieren.
+  { sudo -u "$SITE_USER" -H "$CLEANUP" \
       --path "$WP_PATH" \
       --wp-bin "$SITE_WP" \
       --backup "$BACKUP" \
-      $APPLY > "$LOG" 2>&1
-  RC=$?
+      $APPLY 2>&1; RC=$?; } > "$LOG"
 
   if [[ $RC -ne 0 ]]; then
     echo "  FAILED (exit ${RC}) - see ${LOG}"

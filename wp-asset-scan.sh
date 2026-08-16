@@ -214,7 +214,6 @@ for ROOT in "${ROOTS[@]}"; do
     # direkt darunter. Tiefer liegende index.php gehoeren zu Themes/Plugins.
     BODY=$(sed -E 's://.*$::; s:/\*.*\*/::' "$IDX" 2>/dev/null | grep -vE '^\s*(\*|/\*|\*/)?\s*$' | grep -v '^\s*#')
     LINES=$(echo "$BODY" | grep -cve '^\s*$')
-    SIZE=$(stat -c%s "$IDX")
     # Eine index.php mit viel Code ist kein Loader - das ist normal fuer
     # den WordPress-Kern selbst, deshalb hier nur kleine Dateien bewerten.
     [[ "$LINES" -gt 60 ]] && continue

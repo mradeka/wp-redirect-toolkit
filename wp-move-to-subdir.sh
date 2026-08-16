@@ -32,7 +32,7 @@ APPLY=0
 SKIP_APACHE=0
 WP_BIN="${WP_BIN:-wp}"
 
-usage() { sed -n '2,28p' "$0"; exit 1; }
+usage() { sed -n '2,28p' "$0"; exit "${1:-1}"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
     --wp-bin) WP_BIN="$2"; shift 2 ;;
     --apply)  APPLY=1; shift ;;
     --skip-apache-check) SKIP_APACHE=1; shift ;;
-    -h|--help) usage ;;
+    -h|--help) usage 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
