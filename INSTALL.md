@@ -165,6 +165,7 @@ jedem Lauf — dieser Abschnitt ist die manuelle Variante für den Einstieg.
 ```bash
 git clone https://github.com/DEIN-NAME/wp-redirect-toolkit.git
 cd wp-redirect-toolkit
+chmod +x install.sh
 sudo ./install.sh
 ```
 
