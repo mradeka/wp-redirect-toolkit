@@ -186,6 +186,41 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
+### Mit GitKraken oder einem anderen Windows-Client
+
+Funktioniert, aber zwei Dinge brauchen Aufmerksamkeit:
+
+**Zeilenenden.** Git wandelt unter Windows standardmäßig LF in CRLF um. Ein
+Shell-Skript mit CRLF bricht auf dem Server ab:
+
+```
+/usr/bin/env: 'bash\r': No such file or directory
+```
+
+Die mitgelieferte `.gitattributes` verhindert das (`*.sh text eol=lf`) — sie
+muss allerdings **vor** dem ersten Commit im Repository liegen. Prüfen lässt
+es sich auf dem Server mit:
+
+```bash
+file *.sh | grep CRLF        # darf nichts ausgeben
+```
+
+Falls doch etwas durchgerutscht ist:
+
+```bash
+sed -i 's/\r$//' *.sh
+```
+
+**Ausführungsbit.** Windows kennt kein x-Bit, GitKraken kann es nicht setzen.
+Deshalb steht in den Anleitungen oben überall `chmod +x`. Wer es dauerhaft im
+Repository haben will, setzt es einmalig auf der Kommandozeile:
+
+```bash
+git update-index --chmod=+x install.sh
+git update-index --chmod=+x *.sh
+git commit -m "Ausfuehrungsbit setzen"
+```
+
 ### Variante C — von Hand
 
 ```bash

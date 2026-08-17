@@ -1,0 +1,27 @@
+# Shell-Skripte MUESSEN Unix-Zeilenenden haben.
+# Ohne diese Regel wandelt Git unter Windows LF in CRLF um, und auf dem Server
+# scheitert der Aufruf mit:
+#     /usr/bin/env: 'bash\r': No such file or directory
+*.sh            text eol=lf
+install.sh      text eol=lf
+
+# Konfigurationsdateien fuer den Server ebenso
+*.htaccess      text eol=lf
+htaccess-*.txt  text eol=lf
+blocklist-*.txt text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Dokumentation: Zeilenenden egal, aber als Text behandeln
+*.md            text
+LICENSE         text
+
+# Ausfuehrbarkeit: Git speichert nur das x-Bit, nicht die vollen Rechte.
+# Unter Windows kommt es nicht an - siehe INSTALL.md, Abschnitt 3.
+
+# Archive und Bilder nie umwandeln
+*.zip           binary
+*.gz            binary
+*.phar          binary
+*.png           binary
+*.jpg           binary
