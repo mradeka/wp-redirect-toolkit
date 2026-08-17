@@ -165,7 +165,16 @@ jedem Lauf — dieser Abschnitt ist die manuelle Variante für den Einstieg.
 ```bash
 git clone https://github.com/DEIN-NAME/wp-redirect-toolkit.git
 cd wp-redirect-toolkit
+chmod +x install.sh
 sudo ./install.sh
+```
+
+Das `chmod +x` ist nötig, weil das Ausführungsbit je nach Git-Konfiguration
+(`core.fileMode=false`) oder restriktiver `umask` nicht ankommt. Alternativ
+ohne Rechteänderung:
+
+```bash
+sudo bash install.sh
 ```
 
 ### Variante B — aus dem ZIP-Archiv
@@ -360,6 +369,7 @@ Folgetag. Steigt die Fundzahl wieder von 0 auf mehr, besteht der Zugang weiter
 ```bash
 cd wp-redirect-toolkit
 git pull
+chmod +x install.sh
 sudo ./install.sh
 ```
 
