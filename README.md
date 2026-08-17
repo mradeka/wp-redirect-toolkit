@@ -31,6 +31,7 @@ Alle Skripte sind **standardmäßig Trockenlauf** und schreiben nichts, bis
 | [`wp-move-to-subdir`](#wp-move-to-subdir) | Installation nach `public_html/wordpress/` verschieben | nur mit `--apply` | root |
 | [`check-usrlocalbin-access`](#check-usrlocalbin-access) | Prüft, ob jedes Konto die Werkzeuge nutzen kann | nein | root |
 | [`apply-blocklist`](#apply-blocklist) | Domains der Kampagne sperren oder suchen | nur mit `--apply` | root |
+| [`wp-harden-htaccess`](#wp-harden-htaccess) | Abgesicherte `.htaccess` je Installation ausrollen | nur mit `--apply` | root |
 
 ---
 
@@ -483,6 +484,75 @@ sudo ./apply-blocklist.sh dnsmasq --apply
 > Hosting-Adressen, die sich ändern und mit tausenden legitimen Seiten geteilt
 > werden — eine IP-Regel trifft zu viel und wirkt nur kurz. Und prüfe
 > `ushort.com` gesondert: kurze generische Domains wechseln den Besitzer.
+
+### wp-harden-htaccess
+
+Rollt eine abgesicherte `.htaccess` in jede Installation aus, plus eine zweite
+in `wp-content/uploads/`, die die Ausführung hochgeladener Skripte verhindert.
+
+```bash
+sudo ./wp-harden-htaccess.sh --inventory     # ZUERST: was steht überhaupt drin?
+sudo ./wp-harden-htaccess.sh                 # Trockenlauf
+sudo ./wp-harden-htaccess.sh --only siteuser
+sudo ./wp-harden-htaccess.sh --apply
+sudo ./wp-harden-htaccess.sh --apply --strict          # nur PHP-Handler übernehmen
+sudo ./wp-harden-htaccess.sh --apply --no-xmlrpc-block
+sudo ./wp-harden-htaccess.sh --restore                 # letzte Sicherung zurückspielen
+```
+
+**Warum die vorhandenen Dateien nicht einfach gelöscht werden.** Ein
+einheitlicher Stand über alle Seiten ist das richtige Ziel — aber ein
+pauschales Löschen bricht zwei Dinge:
+
+- **PHP-Handler.** Bei fcgid-Sites legt die `.htaccess` die PHP-Version fest
+  (`AddHandler fcgid-script .php`, `AddType application/x-httpd-php81 .php`).
+  Fällt die Zeile weg, läuft die Seite mit der Server-Vorgabe — oder PHP wird
+  gar nicht mehr ausgeführt und der Browser lädt den Quelltext herunter.
+- **Domain-Umleitungen** mit SEO-Wert und Blöcke von Caching-Plugins.
+
+Umgekehrt darf auch nicht blind alles übernommen werden: Nach einem Vorfall
+kann dort eine eingeschleuste Regel stehen. Deshalb wird **jede Zeile
+klassifiziert**:
+
+| Kategorie | Behandlung |
+|---|---|
+| `php-handler` | immer übernommen, auch mit `--strict` |
+| `gefaehrlich` (`auto_prepend_file`, `auto_append_file`, `eval(`) | **nie** übernommen, wird gemeldet |
+| `externe-weiterleitung`, `rewrite`, `zugriff`, `standard`, `weiterleitung` | übernommen, mit `--strict` verworfen |
+| `unbekannt` | übernommen, mit `--strict` verworfen — vorher ansehen |
+
+`--inventory` zeigt diese Aufstellung für alle Seiten, ohne etwas zu ändern.
+Das ist der richtige erste Schritt, wenn die Dateien historisch gewachsen und
+von Seite zu Seite verschieden sind.
+
+> Dauerhaft sauberer ist es, die PHP-Version im Panel bzw. im vhost zu setzen
+> statt in der `.htaccess`. Dann ist die Datei davon unabhängig und ein
+> einheitlicher Stand über alle Seiten wirklich erreichbar.
+
+Enthalten sind: Verzeichnisauflistung aus, Sperre für `wp-config.php`, Dumps,
+Archive und Punktdateien, keine PHP-Ausführung in `uploads/`, `cache/` und
+`languages/`, XML-RPC gesperrt, Sicherheits-Header, Schutz gegen
+Benutzer-Aufzählung über `?author=`, Komprimierung und Browser-Caching.
+
+**Warum dieses Skript vorsichtiger vorgeht als die übrigen:** Eine fehlerhafte
+`.htaccess` nimmt die Seite sofort vom Netz. Deshalb:
+
+- die vorhandene Datei wird nach `/root/htaccess-backups` gesichert
+- **eigene Rewrite-Regeln werden übernommen**, nicht überschrieben — ein
+  früher erzeugter Absicherungsblock dagegen verworfen, sonst stapeln sich
+  die Blöcke bei jedem Lauf
+- das Layout wird erkannt und die `RewriteBase` entsprechend gesetzt
+  (`/` oder `/wordpress/`)
+- `apachectl configtest` läuft nach dem Schreiben
+- der **HTTP-Status wird vor und nach der Änderung gemessen**; antwortet die
+  Seite danach nicht mehr, wird automatisch zurückgerollt
+- zum Schluss ein Wirksamkeitstest: eine harmlose Testdatei in `uploads/` wird
+  abgerufen und wieder gelöscht. Wird sie ausgeführt, greift die Regel nicht —
+  meist fehlt dann `AllowOverride All`
+
+> Nach dem Ausrollen die Permalinks in wp-admin einmal speichern und Login,
+> Medien-Upload sowie den Block-Editor kurz testen. Bei aktivem
+> Caching-Plugin dessen Regeln neu schreiben lassen.
 
 ### check-usrlocalbin-access
 
