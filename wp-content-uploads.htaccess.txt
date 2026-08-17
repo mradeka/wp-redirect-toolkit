@@ -1,0 +1,42 @@
+# ============================================================================
+#  wp-content/uploads/.htaccess
+#
+#  Zweite Verteidigungslinie: verhindert die Ausfuehrung hochgeladener
+#  Skripte, selbst wenn die Haupt-.htaccess ueberschrieben wird.
+#
+#  Ablage: /pfad/zur/installation/wp-content/uploads/.htaccess
+#  Rechte: 644, Eigentuemer = Seitenbenutzer
+# ============================================================================
+
+# Keine Ausfuehrung von Skripten in diesem Verzeichnis und darunter
+<FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
+    Require all denied
+</FilesMatch>
+
+# Doppelte Endungen: "bild.php.jpg" endet zwar auf .jpg, kann aber auf
+# Servern, die PHP ueber mod_mime anhand einer beliebigen Endung im Namen
+# zuordnen, trotzdem ausgefuehrt werden. Deshalb jede Datei sperren, die
+# eine Skript-Endung IRGENDWO im Namen traegt.
+<FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)\.">
+    Require all denied
+</FilesMatch>
+
+# Selbst wenn eine Datei durchrutscht: als Text ausliefern, nicht ausfuehren
+AddType text/plain .php .phtml .phps .php3 .php4 .php5 .php7 .phar
+
+# Handler-Zuordnung fuer PHP in diesem Verzeichnis vollstaendig aufheben
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .phps .php3 .php4 .php5 .php7 .phar
+    RemoveType    .php .phtml .phps .php3 .php4 .php5 .php7 .phar
+</IfModule>
+
+# Keine Verzeichnisauflistung, keine CGI-Ausfuehrung, keine Server-Side Includes
+Options -Indexes -ExecCGI -Includes
+
+# SVG-Dateien werden im Browser ausgefuehrt und koennen JavaScript enthalten.
+# Erlaubt ein Plugin SVG-Uploads, sollten sie zumindest nicht inline
+# gerendert, sondern heruntergeladen werden:
+# <FilesMatch "\.svg$">
+#     Header set Content-Disposition "attachment"
+#     Header set Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'"
+# </FilesMatch>

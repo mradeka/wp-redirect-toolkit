@@ -1,0 +1,271 @@
+# ============================================================================
+#  WordPress .htaccess - Grundkonfiguration mit Absicherung
+#
+#  Ablage:  im Webroot der Installation
+#           - Standardinstallation:      public_html/.htaccess
+#           - Unterverzeichnis-Layout:   public_html/.htaccess  (dieses hier)
+#             und zusaetzlich public_html/wordpress/.htaccess (siehe unten)
+#
+#  WICHTIG - Reihenfolge:
+#  WordPress verwaltet den Block zwischen "# BEGIN WordPress" und
+#  "# END WordPress" selbst und ueberschreibt ihn beim Speichern der
+#  Permalink-Einstellungen. Alles Eigene gehoert DAVOR oder DANACH,
+#  niemals hinein.
+#
+#  Voraussetzung: AllowOverride All fuer dieses Verzeichnis. Sonst wird die
+#  gesamte Datei stillschweigend ignoriert:
+#      grep -rh AllowOverride /etc/apache2/sites-enabled/
+#
+#  Nach jeder Aenderung pruefen:
+#      apachectl configtest && systemctl reload apache2
+#      curl -sI https://DEINE-DOMAIN/ | head -20
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# 1. Verzeichnisauflistung abschalten
+#    Ohne index-Datei wuerde Apache sonst den Inhalt eines Ordners auflisten.
+# ----------------------------------------------------------------------------
+Options -Indexes
+
+# Symlinks nur, wenn Eigentuemer uebereinstimmt (verhindert Ausbruch aus dem
+# eigenen Verzeichnis ueber untergeschobene Verweise).
+Options +FollowSymLinks -Includes -ExecCGI
+
+
+# ----------------------------------------------------------------------------
+# 2. Sensible Dateien sperren
+#    Diese Dateien sind entweder Konfiguration oder verraten Versionsstaende.
+# ----------------------------------------------------------------------------
+<FilesMatch "^(wp-config\.php|wp-config-sample\.php|\.htaccess|\.htpasswd|\.user\.ini|php\.ini|readme\.html|license\.txt|liesmich\.html|wp-config\.php\.bak.*)$">
+    Require all denied
+</FilesMatch>
+
+# Debug-Log, Datenbank-Dumps, Archive, Sicherungskopien, Versionsverwaltung.
+# Solche Dateien gehoeren nicht in den Webroot - falls doch eine liegen
+# bleibt, ist sie hierueber wenigstens nicht abrufbar.
+<FilesMatch "\.(sql|sql\.gz|tar|tar\.gz|tgz|zip|bak|bakup|backup|old|orig|save|swp|swo|log|phar|env|ini|conf|sh|dist|inc)$">
+    Require all denied
+</FilesMatch>
+
+# Punktdateien (.git, .env, .DS_Store ...) - ausser dem ACME-Verzeichnis,
+# das Let's Encrypt fuer die Domainvalidierung braucht.
+RedirectMatch 404 /\.(?!well-known/)
+
+# Verzeichnisse von Versionsverwaltung und Paketmanagern
+RedirectMatch 404 /(\.git|\.svn|\.hg|node_modules|vendor/bin)/
+
+
+# ----------------------------------------------------------------------------
+# 3. PHP-Ausfuehrung dort unterbinden, wo sie nichts zu suchen hat
+#
+#    Der wichtigste Einzelpunkt der ganzen Datei. Eine hochgeladene PHP-Datei
+#    in uploads/ ist der klassische Weg fuer eine Hintertuer. Zusaetzlich
+#    gehoert eine eigene .htaccess direkt in wp-content/uploads/ - siehe
+#    Abschnitt am Dateiende.
+# ----------------------------------------------------------------------------
+<FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx|exe)$">
+    <If "%{REQUEST_URI} =~ m#/wp-content/(uploads|cache|languages)/#">
+        Require all denied
+    </If>
+</FilesMatch>
+
+
+# ----------------------------------------------------------------------------
+# 4. XML-RPC
+#
+#    Wird fuer Pingbacks, die klassische WordPress-App und Jetpack gebraucht.
+#    Nutzt du davon nichts, ist die Datei ein reines Angriffsziel: Ueber
+#    system.multicall lassen sich hunderte Anmeldeversuche in einer einzigen
+#    Anfrage buendeln.
+#
+#    Standardmaessig aktiv. Kommentiere den Block aus, wenn du die
+#    WordPress-App oder Jetpack einsetzt.
+# ----------------------------------------------------------------------------
+<Files "xmlrpc.php">
+    Require all denied
+</Files>
+
+
+# ----------------------------------------------------------------------------
+# 5. Sicherheits-Header
+#    Ergaenzen den Browserschutz. Content-Security-Policy fehlt bewusst -
+#    eine sinnvolle CSP haengt vom Theme und den Plugins ab und muss
+#    individuell erarbeitet werden, sonst zerlegt sie die Seite.
+# ----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    # Verhindert MIME-Type-Raten (z. B. eine als Bild getarnte HTML-Datei)
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Seite darf nicht in fremde Frames eingebettet werden (Clickjacking)
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Referrer nur an dieselbe Herkunft in voller Laenge
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Geraetezugriffe abschalten, die eine Website normalerweise nicht braucht
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+
+    # HSTS - erst aktivieren, wenn HTTPS auf ALLEN Subdomains sicher laeuft.
+    # Ein Rueckweg ist waehrend der max-age nicht moeglich.
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # PHP-Version nicht ausplaudern
+    Header always unset X-Powered-By
+    Header always unset X-Pingback
+</IfModule>
+
+# Server-Signatur reduzieren (wirkt nur, wenn nicht global ueberschrieben)
+ServerSignature Off
+
+
+# ----------------------------------------------------------------------------
+# 6. Benutzer-Aufzaehlung erschweren
+#    ?author=1 leitet normalerweise auf /author/benutzername/ um und verraet
+#    damit den Anmeldenamen. Der REST-Endpunkt /wp-json/wp/v2/users ebenso.
+#
+#    Hinweis: Den REST-Endpunkt zu sperren ist unbedenklich, solange kein
+#    Plugin ihn oeffentlich braucht. Der Block-Editor nutzt ihn angemeldet
+#    weiter - die Regel greift nur fuer nicht angemeldete Zugriffe nicht
+#    unterscheidbar, deshalb hier nur die Autoren-Abfrage.
+# ----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # /?author=123
+    RewriteCond %{QUERY_STRING} (^|&)author=\d+ [NC]
+    RewriteRule ^$ - [F,L]
+</IfModule>
+
+
+# ----------------------------------------------------------------------------
+# 7. Komprimierung und Browser-Caching
+#    Kein Sicherheitsthema, aber der groesste Hebel fuer die Ladezeit.
+# ----------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain text/html text/xml text/css
+    AddOutputFilterByType DEFLATE application/xml application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE application/json application/rss+xml
+    AddOutputFilterByType DEFLATE image/svg+xml font/woff2 font/woff
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault                          "access plus 1 month"
+    ExpiresByType text/html                 "access plus 0 seconds"
+    ExpiresByType application/json          "access plus 0 seconds"
+    ExpiresByType text/xml                  "access plus 0 seconds"
+    ExpiresByType image/jpeg                "access plus 1 year"
+    ExpiresByType image/png                 "access plus 1 year"
+    ExpiresByType image/webp                "access plus 1 year"
+    ExpiresByType image/avif                "access plus 1 year"
+    ExpiresByType image/svg+xml             "access plus 1 year"
+    ExpiresByType font/woff2                "access plus 1 year"
+    ExpiresByType text/css                  "access plus 1 year"
+    ExpiresByType application/javascript    "access plus 1 year"
+</IfModule>
+
+# Zeichensatz, damit Umlaute ohne Meta-Angabe korrekt ankommen
+AddDefaultCharset UTF-8
+
+
+# ============================================================================
+# BEGIN WordPress
+# Die Anweisungen zwischen "BEGIN WordPress" und "END WordPress" werden
+# dynamisch erzeugt und sollten nur ueber WordPress-Filter geaendert werden.
+# Aenderungen hier werden ueberschrieben.
+# ============================================================================
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+
+
+# ============================================================================
+#  ZUSATZDATEIEN - separat anlegen, nicht hier einfuegen
+# ============================================================================
+#
+#  wp-content/uploads/.htaccess
+#  ----------------------------
+#  Zweite Verteidigungslinie fuer den wichtigsten Punkt. Auch wenn Abschnitt 3
+#  greift: doppelt haelt besser, und diese Datei wirkt selbst dann, wenn die
+#  Hauptdatei einmal ueberschrieben wird.
+#
+#      <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)$">
+#          Require all denied
+#      </FilesMatch>
+#      Options -Indexes -ExecCGI
+#      AddType text/plain .php .phtml .phps
+#
+#
+#  wp-includes/.htaccess  (optional)
+#  ---------------------------------
+#  Direktaufrufe von Kerndateien unterbinden. Vorsicht: ms-files.php wird bei
+#  Multisite gebraucht, wp-tinymce.php vom Editor.
+#
+#      <FilesMatch "^(wp-tinymce\.php|ms-files\.php)$">
+#          Require all granted
+#      </FilesMatch>
+#      <FilesMatch "\.(php|phtml)$">
+#          Require all denied
+#      </FilesMatch>
+#
+#
+#  Unterverzeichnis-Layout (Kern in public_html/wordpress/)
+#  --------------------------------------------------------
+#  Diese Datei bleibt im Webroot. Im Kernverzeichnis liegt zusaetzlich eine
+#  eigene .htaccess mit RewriteBase auf das Unterverzeichnis:
+#
+#      # BEGIN WordPress
+#      <IfModule mod_rewrite.c>
+#      RewriteEngine On
+#      RewriteBase /wordpress/
+#      RewriteRule ^index\.php$ - [L]
+#      RewriteCond %{REQUEST_FILENAME} !-f
+#      RewriteCond %{REQUEST_FILENAME} !-d
+#      RewriteRule . /wordpress/index.php [L]
+#      </IfModule>
+#      # END WordPress
+#
+#
+#  wp-admin absichern (optional, wirksamer als alles andere)
+#  ---------------------------------------------------------
+#  Bei fester IP-Adresse:
+#
+#      <Files "wp-login.php">
+#          Require ip 203.0.113.5
+#      </Files>
+#
+#  Bei wechselnder IP stattdessen Basic Auth vor wp-login.php:
+#
+#      htpasswd -c /home/SITE/.htpasswd adminname
+#
+#      <Files "wp-login.php">
+#          AuthType Basic
+#          AuthName "Restricted"
+#          AuthUserFile /home/SITE/.htpasswd
+#          Require valid-user
+#      </Files>
+#
+#  Achtung: Bei aktivem Basic Auth funktionieren Anwendungspasswoerter und
+#  die REST-API-Authentifizierung nicht mehr - WordPress meldet das im
+#  Website-Zustand.
+#
+#
+#  Was hier bewusst NICHT steht
+#  ----------------------------
+#  - Sperre von /wp-json/ insgesamt: bricht den Block-Editor und viele Plugins
+#  - "Content-Security-Policy": muss pro Theme erarbeitet werden, sonst weisse
+#    Seite. Erst im Report-Only-Modus testen.
+#  - Blockieren von User-Agents oder Laendern: erzeugt mehr Fehlalarme als
+#    Nutzen und veraltet schnell
+#  - php_value-Direktiven: funktionieren nur mit mod_php, nicht mit PHP-FPM.
+#    Dort gehoeren solche Einstellungen in .user.ini
+# ============================================================================

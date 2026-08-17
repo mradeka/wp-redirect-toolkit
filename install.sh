@@ -32,6 +32,7 @@ SCRIPTS=(
   "check-usrlocalbin-access:755"
   "wp-asset-scan:755"
   "apply-blocklist:755"
+  "wp-harden-htaccess:755"
   "wp-rotate-db-passwords:700"
 )
 
