@@ -1,6 +1,6 @@
 # wp-redirect-toolkit
 
-[![shellcheck](https://github.com/DEIN-NAME/wp-redirect-toolkit/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/DEIN-NAME/wp-redirect-toolkit/actions/workflows/shellcheck.yml)
+[![shellcheck](https://github.com/mradeka/wp-redirect-toolkit/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/mradeka/wp-redirect-toolkit/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 
@@ -65,7 +65,7 @@ Kurzfassung. Die ausfuehrliche Anleitung samt Fehlerbehebung steht in
 Voraussetzungen: Bash 4+, WP-CLI 2.7+, MySQL/MariaDB, `curl`, `sudo`.
 
 ```bash
-git clone https://github.com/DEIN-NAME/wp-redirect-toolkit.git
+git clone https://github.com/mradeka/wp-redirect-toolkit.git
 cd wp-redirect-toolkit
 chmod +x install.sh
 sudo ./install.sh
