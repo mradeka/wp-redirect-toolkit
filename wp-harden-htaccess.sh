@@ -110,7 +110,12 @@ mkdir -p "$BACKUP_DIR"; chmod 700 "$BACKUP_DIR"
 common_rules() {   # $1 = 1, wenn xmlrpc gesperrt werden soll
 cat <<'HEAD'
 # ---- Absicherung (erzeugt von wp-harden-htaccess) --------------------------
-Options -Indexes +FollowSymLinks -Includes -ExecCGI
+# Nur -Indexes. Jede Options-Direktive braucht "AllowOverride Options" bzw.
+# "All"; Panels setzen dort meist eine Whitelist OHNE FollowSymLinks. Ein
+# "+FollowSymLinks" quittiert Apache dann mit
+#     Option FollowSymLinks not allowed here
+# und liefert 500 fuer alles unterhalb des Verzeichnisses - auch fuer CSS.
+Options -Indexes
 
 <FilesMatch "^(wp-config\.php|wp-config-sample\.php|\.htaccess|\.htpasswd|\.user\.ini|php\.ini|readme\.html|license\.txt|liesmich\.html)$">
     Require all denied
@@ -221,7 +226,11 @@ AddType text/plain .php .phtml .phps .php3 .php4 .php5 .php7 .phar
     RemoveType    .php .phtml .phps .php3 .php4 .php5 .php7 .phar
 </IfModule>
 
-Options -Indexes -ExecCGI -Includes
+# Bewusst nur -Indexes: -ExecCGI/-Includes braeuchten ebenfalls
+# "AllowOverride Options". Die PHP-Ausfuehrung wird oben ueber FilesMatch,
+# AddType und RemoveHandler unterbunden - dafuer genuegt AllowOverride
+# FileInfo, das praktisch ueberall gesetzt ist.
+Options -Indexes
 UPL
 }
 
@@ -351,10 +360,15 @@ for CONFIG in "${CONFIGS[@]}"; do
   [[ -n "$WPBIN" ]] && SITE_URL=$(sudo -u "$SITE_USER" -H "$WPBIN" --path="$WP_PATH" \
                                   --skip-plugins --skip-themes option get home 2>/dev/null)
   if [[ -n "$SITE_URL" ]]; then
+    # Bei Unterverzeichnis-Installationen liegt die geschriebene .htaccess NICHT
+    # im Webroot. Wird nur die Startseite geprueft, bleibt ein 500 im
+    # Kernverzeichnis unbemerkt - genau dort fehlen dann CSS und JS.
+    CORE_URL="${SITE_URL%/}${SUB:+/$SUB}"
     BEFORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${SITE_URL}/?nocache=$RANDOM")
-    note "HTTP vorher: ${BEFORE}  (${SITE_URL})"
+    BEFORE_CORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${CORE_URL}/wp-includes/js/jquery/jquery.min.js?nocache=$RANDOM")
+    note "HTTP vorher: Startseite ${BEFORE}, Asset im Kern ${BEFORE_CORE}  (${SITE_URL})"
   else
-    BEFORE=""
+    BEFORE=""; BEFORE_CORE=""; CORE_URL=""
     warn "oeffentliche Adresse nicht ermittelbar - kein Vorher/Nachher-Test moeglich"
   fi
 
@@ -484,15 +498,25 @@ for CONFIG in "${CONFIGS[@]}"; do
   if [[ -n "$SITE_URL" && -n "$BEFORE" ]]; then
     sleep 1
     AFTER=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${SITE_URL}/?nocache=$RANDOM")
-    note "HTTP nachher: ${AFTER}"
-    # Verschlechterung = vorher war ok, jetzt nicht mehr
-    if [[ "$BEFORE" =~ ^(200|301|302)$ && ! "$AFTER" =~ ^(200|301|302)$ ]]; then
-      bad "Seite antwortet nach der Aenderung mit ${AFTER} - Rueckrollung"
+    AFTER_CORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${CORE_URL}/wp-includes/js/jquery/jquery.min.js?nocache=$RANDOM")
+    note "HTTP nachher: Startseite ${AFTER}, Asset im Kern ${AFTER_CORE}"
+
+    DEGRADED=0
+    [[ "$BEFORE"      =~ ^(200|301|302)$ && ! "$AFTER"      =~ ^(200|301|302)$ ]] && DEGRADED=1
+    [[ "$BEFORE_CORE" =~ ^(200|301|302)$ && ! "$AFTER_CORE" =~ ^(200|301|302)$ ]] && DEGRADED=1
+
+    if [[ $DEGRADED -eq 1 ]]; then
+      bad "Seite oder Assets antworten nach der Aenderung schlechter - Rueckrollung"
+      # Der Grund steht im Apache-Fehlerlog, typischerweise eine Options-Direktive,
+      # die AllowOverride nicht zulaesst.
+      ERRL=$(grep -h "$WP_PATH" /var/log/apache2/*error*.log /var/log/httpd/*error*.log 2>/dev/null | tail -2)
+      [[ -n "$ERRL" ]] && { note "  Apache meldet:"; echo "$ERRL" | sed 's/^/      /'; }
       if [[ -n "${B:-}" && -f "${B:-}" ]]; then
         cp -p "$B" "$TARGET"; ok "alte .htaccess wiederhergestellt"
       else
         rm -f "$TARGET"; ok ".htaccess entfernt (es gab vorher keine)"
       fi
+      [[ -f "${UPL_DIR}/.htaccess" ]] && rm -f "${UPL_DIR}/.htaccess" && ok "uploads/.htaccess entfernt"
       FAILED=$((FAILED+1)); continue
     fi
   fi

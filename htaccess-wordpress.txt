@@ -28,9 +28,17 @@
 # ----------------------------------------------------------------------------
 Options -Indexes
 
-# Symlinks nur, wenn Eigentuemer uebereinstimmt (verhindert Ausbruch aus dem
-# eigenen Verzeichnis ueber untergeschobene Verweise).
-Options +FollowSymLinks -Includes -ExecCGI
+# ACHTUNG: Jede Options-Direktive braucht "AllowOverride Options" oder "All".
+# Panels (Virtualmin, Plesk, cPanel) setzen dort meist eine Whitelist, in der
+# FollowSymLinks fehlt. Dann quittiert Apache mit
+#     Option FollowSymLinks not allowed here
+# und liefert 500 fuer alles unterhalb - auch fuer CSS und JS.
+#
+# Deshalb steht hier nur -Indexes. Falls dein vhost mehr erlaubt, kannst du
+# ergaenzen (vorher testen!):
+#     Options +SymLinksIfOwnerMatch -Includes -ExecCGI
+# Pruefen, was erlaubt ist:
+#     grep -rh AllowOverride /etc/apache2/sites-enabled/
 
 
 # ----------------------------------------------------------------------------

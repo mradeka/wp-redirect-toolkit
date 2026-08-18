@@ -30,8 +30,11 @@ AddType text/plain .php .phtml .phps .php3 .php4 .php5 .php7 .phar
     RemoveType    .php .phtml .phps .php3 .php4 .php5 .php7 .phar
 </IfModule>
 
-# Keine Verzeichnisauflistung, keine CGI-Ausfuehrung, keine Server-Side Includes
-Options -Indexes -ExecCGI -Includes
+# Nur -Indexes: -ExecCGI und -Includes braeuchten "AllowOverride Options",
+# das viele Panels nicht gewaehren - dann liefert Apache 500 fuer das ganze
+# Verzeichnis. Die PHP-Ausfuehrung ist oben bereits ueber FilesMatch, AddType
+# und RemoveHandler unterbunden; dafuer genuegt AllowOverride FileInfo.
+Options -Indexes
 
 # SVG-Dateien werden im Browser ausgefuehrt und koennen JavaScript enthalten.
 # Erlaubt ein Plugin SVG-Uploads, sollten sie zumindest nicht inline
