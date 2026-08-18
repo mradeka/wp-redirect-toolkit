@@ -29,6 +29,7 @@ Alle Skripte sind **standardmäßig Trockenlauf** und schreiben nichts, bis
 | [`wp-cleanup-all`](#wp-cleanup-all) | Bereinigung über alle Seiten | nur mit `--apply` | root |
 | [`wp-rotate-db-passwords`](#wp-rotate-db-passwords) | Datenbankpasswörter rotieren | nur mit `--apply` | root |
 | [`wp-move-to-subdir`](#wp-move-to-subdir) | Installation nach `public_html/wordpress/` verschieben | nur mit `--apply` | root |
+| [`wp-fix-ownership`](#wp-fix-ownership) | Datei-Eigentümer prüfen und interaktiv korrigieren | nur nach Auswahl | root |
 | [`check-usrlocalbin-access`](#check-usrlocalbin-access) | Prüft, ob jedes Konto die Werkzeuge nutzen kann | nein | root |
 | [`apply-blocklist`](#apply-blocklist) | Domains der Kampagne sperren oder suchen | nur mit `--apply` | root |
 | [`wp-harden-htaccess`](#wp-harden-htaccess) | Abgesicherte `.htaccess` je Installation ausrollen | nur mit `--apply` | root |
@@ -555,6 +556,44 @@ Benutzer-Aufzählung über `?author=`, Komprimierung und Browser-Caching.
 > Nach dem Ausrollen die Permalinks in wp-admin einmal speichern und Login,
 > Medien-Upload sowie den Block-Editor kurz testen. Bei aktivem
 > Caching-Plugin dessen Regeln neu schreiben lassen.
+
+### wp-fix-ownership
+
+Prüft über alle Installationen, ob die Dateien dem jeweiligen Seitenbenutzer
+gehören — und bietet danach eine Auswahl an, welche korrigiert werden sollen.
+
+```bash
+sudo ./wp-fix-ownership.sh              # prüfen, dann interaktiv auswählen
+sudo ./wp-fix-ownership.sh --report     # nur prüfen
+sudo ./wp-fix-ownership.sh --all --yes  # alle betroffenen ohne Rückfrage
+sudo ./wp-fix-ownership.sh --no-chmod   # nur Eigentümer, Rechte unverändert
+```
+
+Auswahl per Nummer: einzeln (`2 5 7`), als Bereich (`2-5`), gemischt
+(`1 3-5 8`), alle (`a`) oder abbrechen (`q`).
+
+**Warum das auftritt:** Läuft ein `wp core download`, ein Update oder ein
+Skript versehentlich als root, gehören die Dateien danach root. Die Symptome
+sehen aus wie unabhängige Probleme:
+
+| Betroffener Bereich | Symptom |
+|---|---|
+| Kern (`wp-admin`, `wp-includes`, Wurzel) | Aktualisierungen fragen nach FTP-Zugangsdaten |
+| `wp-content/uploads` | Medien-Uploads scheitern |
+| generierte Theme-Assets (`uploads/dynamic_avia/`) | Seite verliert ihre Formatierung |
+
+Uploads und Updates können unabhängig voneinander brechen: Für Uploads genügt
+Schreibrecht in `uploads/`, für Updates muss der gesamte Kern dem
+Seitenbenutzer gehören. Deshalb weist die Übersicht den betroffenen Bereich
+aus.
+
+Zur Nachkontrolle ruft das Skript `get_filesystem_method()` auf — genau die
+Funktion, mit der WordPress entscheidet, ob es nach FTP fragt. `direct`
+bedeutet: Aktualisierungen laufen wieder durch.
+
+> `--no-chmod` verwenden, wenn eigene Skripte mit Ausführungsbit im
+> Verzeichnis liegen. Andernfalls werden Rechte auf 755/644 vereinheitlicht;
+> vorher ausführbare Dateien werden vorsorglich nach `/root` protokolliert.
 
 ### check-usrlocalbin-access
 
