@@ -24,8 +24,9 @@
 #   ./wp-db-audit.sh --only siteuser    # a single site user
 #   ./wp-db-audit.sh --quiet            # findings only, no per-site headers
 #
-# Frueher hiess dieses Skript wp-db-audit. Der Name versprach Cron und
-# lieferte alles - deshalb umbenannt und aufgeteilt.
+# This script used to be called wp-cron-audit. The name promised cron and
+# delivered everything - hence the rename and the split. install.sh removes
+# the old name when installing.
 
 set -uo pipefail
 

@@ -59,7 +59,7 @@ ok()   { printf '\033[32m  [ok] %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m  [SUSPECT] %s\033[0m\n' "$*"; }
 bad()  { printf '\033[31m  [HIT]  %s\033[0m\n' "$*"; }
 
-# --- Domainmuster aus der Sperrliste -----------------------------------------
+# --- domain patterns from the blocklist --------------------------------------
 if [[ -f "$LIST" ]]; then
   mapfile -t DOMAINS < <(grep -vE '^\s*#|^\s*$' "$LIST" | tr -d ' \t')
   DOM_RE=$(IFS='|'; echo "${DOMAINS[*]}" | sed 's/\./\\./g')
@@ -87,7 +87,7 @@ for ROOT in "${ROOTS[@]}"; do
   hr "$ROOT"
 
   # -------------------------------------------------------------------------
-  # 1. JS-Dateien: nur das Dateiende pruefen
+  # 1. JS files: check only the end of the file
   # -------------------------------------------------------------------------
   printf '  JS files (last %d bytes)\n' "$TAIL_BYTES"
   JS_HIT=0; JS_SUS=0
@@ -102,9 +102,8 @@ for ROOT in "${ROOTS[@]}"; do
 
       if [[ $APPLY -eq 1 ]]; then
         cp -p "$F" "${F}.bak-$(date +%s)"
-        # Minifiziertes JS steht oft komplett auf einer Zeile - die ganze Zeile
-        # zu loeschen wuerde das Skript zerstoeren. Deshalb wird nur die
-        # eingeschleuste Anweisung herausgeschnitten:
+        # Minified JS often sits entirely on one line - deleting the whole
+        # line would destroy the script. Only the injected statement is cut:
         #   [window.|document.]location[.href|.replace(...)] = "…domain…" ;
         for D in "${DOMAINS[@]}"; do
           DE=${D//./\\.}
@@ -124,7 +123,7 @@ for ROOT in "${ROOTS[@]}"; do
       fi
 
     elif echo "$TAIL" | grep -qE "$PROTO_RE"; then
-      # //https: ist praktisch immer bösartig, auch ohne bekannte Domain
+      # //https: is almost always malicious, even without a known domain
       bad "JS (protocol marker //http): $F"
       echo "$TAIL" | grep -oE ".{0,30}${PROTO_RE}.{0,40}" | head -2 | sed 's/^/             /'
       JS_HIT=$((JS_HIT+1)); TOTAL_HIT=$((TOTAL_HIT+1))
@@ -143,7 +142,7 @@ for ROOT in "${ROOTS[@]}"; do
     printf '  %d JS file(s) with a trailing location assignment - show with --suspicious\n' "$JS_SUS"
 
   # -------------------------------------------------------------------------
-  # 2. Gefaelschte Landeseiten (.htm/.html) - in WordPress unueblich
+  # 2. Fake landing pages (.htm/.html) - unusual in WordPress
   # -------------------------------------------------------------------------
   printf '  HTML files\n'
   HTML_HIT=0
@@ -158,10 +157,10 @@ for ROOT in "${ROOTS[@]}"; do
   done < <(find "$ROOT" -type f \( -name '*.htm' -o -name '*.html' \) -print0 2>/dev/null)
   [[ $HTML_HIT -eq 0 ]] && ok "keine auffaelligen HTML files"
 
-  # Dateinamen der Kampagne. Wichtig: das Standardtheme bringt selbst ein
-  # Muster "page-coming-soon.php" samt Hintergrundbild mit - deshalb werden
-  # Theme- und Plugin-Verzeichnisse ausgenommen und nur Dateien gemeldet, die
-  # tatsaechlich eine Weiterleitung enthalten.
+  # Campaign filenames. Important: the default theme ships a pattern called
+  # "page-coming-soon.php" plus a background image - so theme and plugin
+  # directories are excluded and only files that actually contain a redirect
+  # are reported.
   COMING=$(find "$ROOT" -maxdepth 3 -type f \
              \( -iname '*coming*soon*' -o -iname '*under*construction*' \) \
              ! -path '*/wp-content/themes/*' ! -path '*/wp-content/plugins/*' \
@@ -181,19 +180,19 @@ for ROOT in "${ROOTS[@]}"; do
   fi
 
   # -------------------------------------------------------------------------
-  # 3. PHP ausserhalb der ueblichen Pfade
-  #    Seit WordPress 6.5 liegen Uebersetzungen zusaetzlich als PHP-Dateien
-  #    (*.l10n.php) unter wp-content/languages - das ist legitim und deutlich
-  #    schneller als die alten .mo-Dateien. Solche Dateien werden ausgenommen.
+  # 3. PHP outside the usual paths
+  #    Since WordPress 6.5 translations also ship as PHP files (*.l10n.php)
+  #    under wp-content/languages - that is legitimate and considerably
+  #    faster than the old .mo files. Such files are excluded.
   # -------------------------------------------------------------------------
   printf '  PHP in unusual places\n'
   PHP_HIT=0
   while IFS= read -r -d '' F; do
     case "$F" in
-      *.l10n.php) continue ;;                  # Uebersetzungsdatei
+      *.l10n.php) continue ;;                  # translation file
       */languages/*.php)
-        # andere PHP-Dateien unter languages/ nur melden, wenn sie Code
-        # ausfuehren statt nur ein Array zurueckzugeben
+        # report other PHP files under languages/ only if they execute code
+        # instead of just returning an array
         head -c 200 "$F" | grep -qE '^\s*<\?php\s+return\s*\[' && continue
         ;;
     esac
@@ -204,18 +203,18 @@ for ROOT in "${ROOTS[@]}"; do
   [[ $PHP_HIT -eq 0 ]] && ok "no unexpected PHP in uploads/cache/languages"
 
   # -------------------------------------------------------------------------
-  # 3b. index.php im Webroot (Loader bei Unterverzeichnis-Installationen)
+  # 3b. index.php in the webroot (loader for subdirectory installs)
   # -------------------------------------------------------------------------
   printf '  index.php (loader)\n'
   IDX_HIT=0
   for IDX in "${ROOT}/index.php" "${ROOT}"/*/index.php; do
     [[ -f "$IDX" ]] || continue
-    # nur Dateien betrachten, die wie ein Loader aussehen sollen: Webroot oder
-    # direkt darunter. Tiefer liegende index.php gehoeren zu Themes/Plugins.
+    # only look at files that should look like a loader: webroot or directly
+    # below it. Deeper index.php files belong to themes/plugins.
     BODY=$(sed -E 's://.*$::; s:/\*.*\*/::' "$IDX" 2>/dev/null | grep -vE '^\s*(\*|/\*|\*/)?\s*$' | grep -v '^\s*#')
     LINES=$(echo "$BODY" | grep -cve '^\s*$')
-    # Eine index.php mit viel Code ist kein Loader - das ist normal fuer
-    # den WordPress-Kern selbst, deshalb hier nur kleine Dateien bewerten.
+    # An index.php with a lot of code is not a loader - that is normal for
+    # WordPress core itself, so only small files are judged here.
     [[ "$LINES" -gt 60 ]] && continue
 
     DANGER=$(echo "$BODY" | grep -inE \
@@ -239,8 +238,8 @@ for ROOT in "${ROOTS[@]}"; do
   [[ $IDX_HIT -eq 0 ]] && ok "no suspicious index.php"
 
   # -------------------------------------------------------------------------
-  # 5. Weitere Dateibefunde (aus wp-db-audit hierher verschoben - alles, was
-  #    im Dateisystem liegt, gehoert in dieses Skript)
+  # 5. Further file findings (moved here from wp-db-audit - everything that
+  #    lives in the filesystem belongs in this script)
   # -------------------------------------------------------------------------
   printf '  Further file checks\n'
   MISC=0
@@ -250,24 +249,23 @@ for ROOT in "${ROOTS[@]}"; do
     [[ -n "$MU" ]] && { bad "mu-plugins present (always loaded): $(echo "$MU" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
   fi
 
-  # Verschleierung: Der Kern (wp-admin, wp-includes) ist bereits durch die
-  # Pruefsummen abgedeckt und enthaelt legitime Treffer - class-pclzip.php
-  # nutzt gzinflate/gzdeflate zum Ent- und Packen von ZIP-Daten und traegt ein
-  # auskommentiertes eval(. Deshalb hier nur wp-content pruefen und zwischen
-  # starken und schwachen Mustern unterscheiden.
+  # Obfuscation: core (wp-admin, wp-includes) is already covered by checksums
+  # and contains legitimate hits - class-pclzip.php uses gzinflate/gzdeflate
+  # to pack and unpack ZIP data and carries a commented-out eval(. So only
+  # wp-content is searched here, distinguishing strong from weak patterns.
   OBF_SCOPE="${ROOT}/wp-content"
   [[ -d "$OBF_SCOPE" ]] || OBF_SCOPE="$ROOT"
 
-  # stark: die Kombination aus Ausfuehrung und Verschleierung, oder
-  # Ausfuehrung direkt aus Benutzereingaben - beides hat in legitimem
-  # Code praktisch nie einen Grund
+  # strong: the combination of execution and obfuscation, or execution
+  # straight from user input - neither has a plausible reason in legitimate
+  # code
   OBF_STRONG=$(grep -rlE \
     'eval\s*\(\s*(base64_decode|gzinflate|gzuncompress|str_rot13|stripslashes|\$_(GET|POST|REQUEST|COOKIE))|assert\s*\(\s*\$_|preg_replace\s*\(\s*["'"'"'][^"'"'"']*/[a-z]*e[a-z]*["'"'"']|create_function\s*\(.*\$_|\$\{\s*["'"'"']_(GET|POST|REQUEST)|(base64_decode|gzinflate)\s*\(\s*["'"'"'][A-Za-z0-9+/=]{200,}' \
     "$OBF_SCOPE" --include='*.php' 2>/dev/null | head -5)
   [[ -n "$OBF_STRONG" ]] && { bad "obfuscation + execution: $(echo "$OBF_STRONG" | tr '\n' ' ')"; MISC=1; TOTAL_HIT=$((TOTAL_HIT+1)); }
 
-  # schwach: einzelne Funktionen, die auch legitim vorkommen (Caches,
-  # Minifier, Importer). Nur mit --suspicious anzeigen.
+  # weak: single functions that also occur legitimately (caches, minifiers,
+  # importers). Shown only with --suspicious.
   if [[ $SHOW_SUSPECT -eq 1 ]]; then
     OBF_WEAK=$(grep -rlE 'base64_decode|gzinflate|str_rot13|create_function' \
       "$OBF_SCOPE" --include='*.php' 2>/dev/null | head -10)
@@ -295,7 +293,7 @@ for ROOT in "${ROOTS[@]}"; do
   [[ $MISC -eq 0 ]] && ok "no further file findings"
 
   # -------------------------------------------------------------------------
-  # 6. Pruefsummen - braucht WP-CLI, deshalb erst hier
+  # 6. Checksums - needs WP-CLI, hence only here
   # -------------------------------------------------------------------------
   WPDIR=""
   for CAND in "$ROOT" "$ROOT"/wordpress "$ROOT"/wp; do
@@ -348,7 +346,7 @@ for ROOT in "${ROOTS[@]}"; do
   fi
 
   # -------------------------------------------------------------------------
-  # 7. Theme-Assets, die aus der Datenbank neu erzeugt werden
+  # 7. Theme assets regenerated from the database
   # -------------------------------------------------------------------------
   MERGED=$(find "$ROOT" -path '*uploads/dynamic_avia/*' -o -path '*cache/autoptimize/*' \
                         -o -path '*cache/min/*' 2>/dev/null | head -5)

@@ -1,17 +1,16 @@
-# Domains der Weiterleitungskampagne (Stand August 2026)
+# Domains of the redirect campaign (as of August 2026)
 #
-# Quellen:
-#   - eigener Vorfall August 2026: urshort.com, ushort.company, ushort.org
-#   - Sal Aguilar / WPSecurityAnalyzer, Mai 2026 (dieselbe Kampagne):
+# Sources:
+#   - own incident, August 2026: urshort.com, ushort.company, ushort.org
+#   - Sal Aguilar / WPSecurityAnalyzer, May 2026 (same campaign):
 #     ushort.observer, ushort.info, u-short.net, urshort.live, ushort.today,
 #     ushort.com, ushort.dev
 #
-# Eine Zeile pro Domain, Kommentare mit #. Zum Einlesen in Firewalls,
-# DNS-Sperrlisten oder Suchskripte gedacht.
+# One domain per line, comments with #. Meant to be read by firewalls, DNS
+# blocklists or search scripts.
 #
-# HINWEIS zu ushort.com: kurze, generische Domains wechseln den Besitzer.
-# Vor dem Sperren prüfen, sonst blockierst du unter Umständen einen
-# legitimen Kurz-URL-Dienst und merkst es erst spät.
+# NOTE on ushort.com: short generic domains change hands. Verify before
+# blocking, or you may block a legitimate URL shortener and only notice late.
 
 u-short.net
 urshort.com
@@ -24,11 +23,11 @@ ushort.observer
 ushort.org
 ushort.today
 
-# Pfadmuster der Kampagne: /[A-Za-z0-9]{10} mit angehaengter Kennung
-#   0r2, 0r3, 0r4, 0r5  - offenbar die Nummer der Angriffswelle
+# Path pattern of the campaign: /[A-Za-z0-9]{10} with an appended marker
+#   0r2, 0r3, 0r4, 0r5  - apparently the number of the attack wave
 #
-# Weitere Marker (keine Domains, nicht zum Sperren):
+# Further markers (not domains, not for blocking):
 #   <meta http-equiv="refresh" content="7; url=https://<domain>/<token>"
-#   window.location.href = "//https://<domain>/<token>";   (am Ende von JS-Dateien)
-#   gefaelschte "Coming soon"-Seiten als .htm, .html, .php
-#   WP-Cron-Hooks mit Zufallsnamen (12+ Zeichen, Buchstaben und Ziffern)
+#   window.location.href = "//https://<domain>/<token>";   (end of JS files)
+#   fake "Coming soon" pages as .htm, .html, .php
+#   WP-Cron hooks with random names (12+ chars, letters and digits)

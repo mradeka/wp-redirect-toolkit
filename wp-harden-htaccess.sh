@@ -72,33 +72,34 @@ classify_line() {
   case "$L" in
     ''|'#'*) echo "comment"; return ;;
   esac
-  # 1. Eindeutig boesartig - ZUERST pruefen. "php_value auto_prepend_file"
-  #    sieht sonst wie ein harmloser PHP-Handler aus und wuerde uebernommen,
-  #    obwohl genau darueber Schadcode bei jedem Aufruf nachgeladen wird.
+  # 1. Clearly malicious - checked FIRST. Otherwise "php_value
+  #    auto_prepend_file" looks like a harmless PHP handler and would be
+  #    carried over, although that is exactly how malicious code gets loaded
+  #    on every request.
   if grep -qiE 'auto_prepend_file|auto_append_file|base64_decode|eval\(|include_path\s*=|\bpython\b|\bperl\b.*-e' <<<"$L"; then
     echo "dangerous"; return
   fi
-  # 2. Muss erhalten bleiben - sonst bricht PHP oder die Panel-Konfiguration
+  # 2. Must be preserved - otherwise PHP or the panel config breaks
   if grep -qiE '^\s*(AddHandler|AddType|FCGIWrapper|Action|SetHandler|php_value|php_admin_value|php_flag|php_admin_flag|suPHP)' <<<"$L"; then
     echo "php-handler"; return
   fi
-  # Weiterleitung auf eine fremde Domain
+  # Redirect to a foreign domain
   if grep -qiE '^\s*(RewriteRule|Redirect|RedirectMatch|RedirectPermanent)\b.*https?://' <<<"$L"; then
     echo "external-redirect"; return
   fi
-  # Options-Direktiven brauchen "AllowOverride Options" bzw. "All". Panels
-  # setzen dort meist eine Whitelist ohne FollowSymLinks/ExecCGI/Includes.
-  # Steht so eine Zeile in der alten Datei, hat sie dort vielleicht
-  # funktioniert - nach einer vhost-Aenderung liefert Apache aber
+  # Options directives need "AllowOverride Options" or "All". Panels usually
+  # set a whitelist there without FollowSymLinks/ExecCGI/Includes. If such a
+  # line sits in the old file it may have worked there - but after a vhost
+  # change Apache answers with
   #     Option FollowSymLinks not allowed here
-  # und damit 500 fuer alles unterhalb. Deshalb nicht uebernehmen.
+  # and returns 500 for everything below. So it is not carried over.
   if grep -qiE '^\s*Options\b' <<<"$L"; then
     if grep -qiE '^\s*Options\s+-Indexes\s*$' <<<"$L"; then
       echo "standard"; return
     fi
     echo "options-risk"; return
   fi
-  # 3. Uebliche, unkritische Kategorien
+  # 3. Common, uncritical categories
   grep -qiE '^\s*(Redirect|RedirectMatch|RedirectPermanent|RedirectTemp)\b' <<<"$L" && { echo "redirect"; return; }
   grep -qiE '^\s*(RewriteEngine|RewriteBase|RewriteCond|RewriteRule|RewriteOptions)' <<<"$L" && { echo "rewrite"; return; }
   grep -qiE '^\s*(<Files|<FilesMatch|<Directory|<DirectoryMatch|<Limit|<LimitExcept|Require|Order|Allow|Deny|Auth|Satisfy)' <<<"$L" && { echo "access"; return; }
@@ -122,11 +123,11 @@ mkdir -p "$BACKUP_DIR"; chmod 700 "$BACKUP_DIR"
 common_rules() {   # $1 = 1, wenn xmlrpc gesperrt werden soll
 cat <<'HEAD'
 # ---- Absicherung (erzeugt von wp-harden-htaccess) --------------------------
-# Nur -Indexes. Jede Options-Direktive braucht "AllowOverride Options" bzw.
-# "All"; Panels setzen dort meist eine Whitelist OHNE FollowSymLinks. Ein
-# "+FollowSymLinks" quittiert Apache dann mit
+# Only -Indexes. Every Options directive needs "AllowOverride Options" or
+# "All"; panels usually set a whitelist WITHOUT FollowSymLinks. Apache then
+# answers a "+FollowSymLinks" with
 #     Option FollowSymLinks not allowed here
-# und liefert 500 fuer alles unterhalb des Verzeichnisses - auch fuer CSS.
+# and returns 500 for everything below the directory - including CSS.
 Options -Indexes
 
 <FilesMatch "^(wp-config\.php|wp-config-sample\.php|\.htaccess|\.htpasswd|\.user\.ini|php\.ini|readme\.html|license\.txt|liesmich\.html)$">
@@ -165,8 +166,8 @@ cat <<'TAIL'
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
     Header always unset X-Powered-By
     Header always unset X-Pingback
-    # HSTS bewusst deaktiviert - erst einschalten, wenn HTTPS auf allen
-    # Subdomains laeuft, ein Rueckweg ist waehrend max-age nicht moeglich:
+    # HSTS deliberately disabled - only enable once HTTPS runs on all
+    # subdomains; there is no way back during max-age:
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 </IfModule>
 
@@ -222,30 +223,30 @@ cat <<'UPL'
 # ---- erzeugt von wp-harden-htaccess ---------------------------------------
 # Keine Ausfuehrung hochgeladener Skripte.
 #
-# WICHTIG bei mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
-# Dort laeuft PHP ueber "AddHandler fcgid-script .php" aus dem vhost. Ein
-# "AddType text/plain .php" in dieser Datei ueberschreibt die Zuordnung und
-# bricht die PHP-Verarbeitung im ganzen Verzeichnisbaum - Uploads scheitern
-# dann mit "could not be moved". Richtig ist RemoveHandler: es entfernt die
-# Zuordnung nur fuer dieses Verzeichnis.
+# IMPORTANT with mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
+# There PHP runs via "AddHandler fcgid-script .php" from the vhost. An
+# "AddType text/plain .php" in this file overrides that mapping and breaks
+# PHP processing for the whole directory tree - uploads then fail with
+# "could not be moved". RemoveHandler is correct: it drops the mapping for
+# this directory only.
 <IfModule mod_mime.c>
     RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.0 .php8.1 .php8.2 .php8.3 .php8.4 .phtml .phps .phar .pht
 </IfModule>
 
-# Zusaetzlich der direkte Zugriffsschutz. Nur auf Skript-Endungen - Bilder,
-# PDFs und alles andere bleiben abrufbar.
+# Plus direct access protection. Script extensions only - images, PDFs and
+# everything else stay reachable.
 <FilesMatch "\.(php|php[0-9]|php[0-9]\.[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
     Require all denied
 </FilesMatch>
 
-# Doppelte Endungen ("bild.php.jpg") werden auf manchen Servern trotzdem als
-# PHP ausgefuehrt - deshalb jede Skript-Endung IRGENDWO im Namen sperren.
+# Double extensions ("image.php.jpg") are still executed as PHP on some
+# servers - so block any script extension ANYWHERE in the name.
 <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)\.">
     Require all denied
 </FilesMatch>
 
-# Bewusst nur -Indexes: -ExecCGI/-Includes braeuchten "AllowOverride Options",
-# das viele Panels nur mit einer Whitelist gewaehren.
+# Deliberately only -Indexes: -ExecCGI/-Includes would need "AllowOverride
+# Options", which many panels grant only through a whitelist.
 Options -Indexes
 UPL
 }
@@ -376,9 +377,9 @@ for CONFIG in "${CONFIGS[@]}"; do
   [[ -n "$WPBIN" ]] && SITE_URL=$(sudo -u "$SITE_USER" -H "$WPBIN" --path="$WP_PATH" \
                                   --skip-plugins --skip-themes option get home 2>/dev/null)
   if [[ -n "$SITE_URL" ]]; then
-    # Bei Unterverzeichnis-Installationen liegt die geschriebene .htaccess NICHT
-    # im Webroot. Wird nur die Startseite geprueft, bleibt ein 500 im
-    # Kernverzeichnis unbemerkt - genau dort fehlen dann CSS und JS.
+    # For subdirectory installs the .htaccess written is NOT in the webroot.
+    # Checking only the home page would miss a 500 in the core directory -
+    # which is exactly where CSS and JS then go missing.
     CORE_URL="${SITE_URL%/}${SUB:+/$SUB}"
     BEFORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${SITE_URL}/?nocache=$RANDOM")
     BEFORE_CORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${CORE_URL}/wp-includes/js/jquery/jquery.min.js?nocache=$RANDOM")
@@ -422,7 +423,7 @@ for CONFIG in "${CONFIGS[@]}"; do
         dangerous)
           DROPPED+="[dangerous] $L"$'\n' ;;
         options-risk)
-          # Nie uebernehmen: braucht AllowOverride Options, sonst 500
+          # Never carried over: needs AllowOverride Options, otherwise 500
           DROPPED+="[Options needs AllowOverride Options] $L"$'\n' ;;
         php-handler)
           KEPT_PHP=1
@@ -526,8 +527,8 @@ for CONFIG in "${CONFIGS[@]}"; do
 
     if [[ $DEGRADED -eq 1 ]]; then
       bad "site or assets respond worse after the change - rolling back"
-      # Der Grund steht im Apache-Fehlerlog, typischerweise eine Options-Direktive,
-      # die AllowOverride nicht zulaesst.
+      # The reason is in the Apache error log, typically an Options directive
+      # that AllowOverride does not permit.
       ERRL=$(grep -h "$WP_PATH" /var/log/apache2/*error*.log /var/log/httpd/*error*.log 2>/dev/null | tail -2)
       [[ -n "$ERRL" ]] && { note "  Apache reports:"; echo "$ERRL" | sed 's/^/      /'; }
       if [[ -n "${B:-}" && -f "${B:-}" ]]; then
