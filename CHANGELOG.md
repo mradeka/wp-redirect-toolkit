@@ -3,7 +3,7 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] — 2026-08-18
 
 ### Changed
 
@@ -58,3 +58,6 @@ against actual findings **and** against legitimate counter-examples.
 - Commercial themes and plugins have no checksums. They are named and
   explicitly marked as unverified.
 - The path assumption is `/home/<user>/public_html[/wordpress]`.
+
+[1.1.0]: https://github.com/mradeka/wp-redirect-toolkit/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/mradeka/wp-redirect-toolkit/releases/tag/v1.0.0
