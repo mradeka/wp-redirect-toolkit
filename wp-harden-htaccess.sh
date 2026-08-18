@@ -86,6 +86,18 @@ classify_line() {
   if grep -qiE '^\s*(RewriteRule|Redirect|RedirectMatch|RedirectPermanent)\b.*https?://' <<<"$L"; then
     echo "externe-weiterleitung"; return
   fi
+  # Options-Direktiven brauchen "AllowOverride Options" bzw. "All". Panels
+  # setzen dort meist eine Whitelist ohne FollowSymLinks/ExecCGI/Includes.
+  # Steht so eine Zeile in der alten Datei, hat sie dort vielleicht
+  # funktioniert - nach einer vhost-Aenderung liefert Apache aber
+  #     Option FollowSymLinks not allowed here
+  # und damit 500 fuer alles unterhalb. Deshalb nicht uebernehmen.
+  if grep -qiE '^\s*Options\b' <<<"$L"; then
+    if grep -qiE '^\s*Options\s+-Indexes\s*$' <<<"$L"; then
+      echo "standard"; return
+    fi
+    echo "options-risiko"; return
+  fi
   # 3. Uebliche, unkritische Kategorien
   grep -qiE '^\s*(Redirect|RedirectMatch|RedirectPermanent|RedirectTemp)\b' <<<"$L" && { echo "weiterleitung"; return; }
   grep -qiE '^\s*(RewriteEngine|RewriteBase|RewriteCond|RewriteRule|RewriteOptions)' <<<"$L" && { echo "rewrite"; return; }
@@ -405,6 +417,9 @@ for CONFIG in "${CONFIGS[@]}"; do
       case "$C" in
         gefaehrlich)
           DROPPED+="[gefaehrlich] $L"$'\n' ;;
+        options-risiko)
+          # Nie uebernehmen: braucht AllowOverride Options, sonst 500
+          DROPPED+="[Options braucht AllowOverride Options] $L"$'\n' ;;
         php-handler)
           KEPT_PHP=1
           CUSTOM+="$L"$'\n' ;;
