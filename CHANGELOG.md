@@ -1,63 +1,60 @@
-# Änderungsprotokoll
+# Changelog
 
-Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-Versionierung nach [SemVer](https://semver.org/lang/de/).
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
-### Geändert
+### Changed
 
-- Alle Skriptausgaben, Hilfetexte und Kommentare auf **Englisch** umgestellt
-- `README.md` ist jetzt englisch; die deutsche Fassung liegt als
-  `README.de.md` daneben
-- Klassifikationsbezeichner in `wp-harden-htaccess` englisch
-  (`dangerous`, `options-risk`, `external-redirect`, `unknown` …)
+- All script output, help text and comments switched to **English**
+- `README.md` is now English; the German version lives alongside as
+  `README.de.md`
+- Classification identifiers in `wp-harden-htaccess` are English
+  (`dangerous`, `options-risk`, `external-redirect`, `unknown`, …)
 
-### Hinzugefügt
+### Added
 
-- `wp-fix-ownership` — Datei-Eigentümer prüfen und interaktiv korrigieren
-- `wp-harden-htaccess` — abgesicherte `.htaccess` ausrollen, mit Inventar,
-  Klassifikation übernommener Regeln und automatischem Rollback
-- `.gitattributes` erzwingt LF-Zeilenenden für Shell-Skripte
+- `wp-fix-ownership` — check file ownership and fix it interactively
+- `wp-harden-htaccess` — roll out a hardened `.htaccess`, with inventory,
+  classification of carried-over rules and automatic rollback
+- `.gitattributes` enforces LF line endings for shell scripts
 
-### Behoben
+### Fixed
 
-- `Options +FollowSymLinks` aus allen `.htaccess`-Vorlagen entfernt — benötigt
-  `AllowOverride Options`, was Panels meist nicht gewähren; führte zu 500
-- `AddType text/plain .php` durch `RemoveHandler` ersetzt — brach bei fcgid
-  die PHP-Verarbeitung im ganzen Verzeichnisbaum
-- Rollback in `wp-harden-htaccess` prüft jetzt auch ein Asset im
-  Kernverzeichnis, nicht nur die Startseite
+- Removed `Options +FollowSymLinks` from all `.htaccess` templates — it needs
+  `AllowOverride Options`, which panels usually do not grant, and caused a 500
+- Replaced `AddType text/plain .php` with `RemoveHandler` — on fcgid the
+  former overrode the handler mapping and broke PHP for the whole directory
+  tree
+- Rollback in `wp-harden-htaccess` now also checks an asset in the core
+  directory, not just the home page
 
 ## [1.0.0] — 2026-08-16
 
-Erste Veröffentlichung. Entstanden während eines realen Vorfalls; alle
-Erkennungsmuster sind gegen echte Befunde und gegen legitime Gegenbeispiele
-geprüft.
+First release. Built during a real incident; every detection pattern is tested
+against actual findings **and** against legitimate counter-examples.
 
-### Enthalten
+### Included
 
-- `wp-db-audit` — Datenbank und Konfiguration: Cron-Hooks mit Zufallsnamen,
-  Weiterleitungs-Nutzlast, auseinanderlaufende `home`/`siteurl`,
-  Administratorkonten
-- `wp-asset-scan` — Dateisystem: JS-Injektionen, gefälschte Landeseiten,
-  `index.php`-Loader, PHP an untypischen Orten, mu-plugins, Verschleierung,
-  Dumps im Webverzeichnis, Prüfsummen von Kern, Plugins und Themes
-- `wp-cron-list` — Cron-Tabelle aller Seiten, Zufallsnamen markiert
-- `wp-user-audit` — Benutzerkonten bewerten, Auth-Salts erneuern
-- `wp-redirect-cleanup` (v7) — Bereinigung einer Installation in vier
-  Durchgängen
-- `wp-cleanup-all` — Bereinigung über alle Seiten
-- `wp-rotate-db-passwords` — Datenbankpasswörter rotieren, mit Rollback
-- `wp-move-to-subdir` — Umzug nach `public_html/wordpress/`
-- `check-usrlocalbin-access` — Nutzbarkeit der Werkzeuge je Konto
-- `apply-blocklist` — Sperrregeln aus `blocklist-domains.txt`
+- `wp-db-audit` — database and configuration: cron hooks with random-looking
+  names, redirect payload, diverging `home`/`siteurl`, administrator accounts
+- `wp-asset-scan` — filesystem: JS injections, fake landing pages,
+  `index.php` loaders, PHP in unusual places, mu-plugins, obfuscation, dumps
+  in the webroot, checksums for core, plugins and themes
+- `wp-cron-list` — cron table across all sites, random names flagged
+- `wp-user-audit` — score user accounts, rotate auth salts
+- `wp-redirect-cleanup` (v7) — clean one installation in four passes
+- `wp-cleanup-all` — run the cleanup across all sites
+- `wp-rotate-db-passwords` — rotate database passwords, with rollback
+- `wp-move-to-subdir` — move an install into `public_html/wordpress/`
+- `check-usrlocalbin-access` — check the tools are usable per account
+- `apply-blocklist` — blocking rules from `blocklist-domains.txt`
 
-### Bekannte Einschränkungen
+### Known limitations
 
-- Serialisierte Werte in `wp_options`, `postmeta` und `comments` werden
-  gemeldet, aber nicht automatisch bereinigt — ein blinder Schnitt zerstört
-  dort die Längenangaben.
-- Gekaufte Themes und Plugins haben keine Prüfsummen. Sie werden benannt und
-  ausdrücklich als ungeprüft gekennzeichnet.
-- Pfadannahme ist `/home/<benutzer>/public_html[/wordpress]`.
+- Serialised values in `wp_options`, `postmeta` and `comments` are reported
+  but not cleaned automatically — a blind cut destroys the length prefixes.
+- Commercial themes and plugins have no checksums. They are named and
+  explicitly marked as unverified.
+- The path assumption is `/home/<user>/public_html[/wordpress]`.

@@ -36,7 +36,7 @@ jobs:
         run: |
           if grep -rInE '(password|passwd|secret)[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'$]{6,}' \
                --include='*.sh' --include='*.md' . ; then
-            echo "Möglicher hartcodierter Zugangsdatensatz gefunden."
+            echo "Possible hard-coded credential found."
             exit 1
           fi
-          echo "keine hartcodierten Zugangsdaten"
+          echo "no hard-coded credentials"

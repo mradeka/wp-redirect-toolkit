@@ -1,49 +1,46 @@
-# Sicherheitshinweise
+# Security Policy
 
-## Was diese Skripte tun — und was das bedeutet
+## What these scripts do — and what that means
 
-Dieses Toolkit greift tief in produktive Systeme ein: Es liest und schreibt
-WordPress-Datenbanken, ändert `wp-config.php`, rotiert Datenbankpasswörter und
-löscht Dateien. Es ist für den Einsatz auf Servern gedacht, die man selbst
-verwaltet.
+This toolkit reaches deep into production systems: it reads and writes
+WordPress databases, edits `wp-config.php`, rotates database passwords and
+deletes files. It is meant for servers you administer yourself.
 
-Alle schreibenden Skripte laufen ohne `--apply` als Trockenlauf und legen vor
-jeder Änderung eine Sicherung an. Das ersetzt kein eigenes Backup außerhalb
-des Servers.
+Every writing script is a dry run without `--apply` and takes a backup before
+any change. That does not replace your own backup outside the server.
 
-## Zwei Dateien mit besonderem Schutzbedarf
+## Two files that need protection
 
-- **`/root/wp-db-credentials.txt`** — wird von `wp-rotate-db-passwords`
-  angelegt und enthält Datenbankpasswörter im Klartext. Modus 600, gehört
-  root, und darf niemals in ein Repository, ein Ticket oder ein weitergegebenes
-  Backup gelangen. Die mitgelieferte `.gitignore` schließt sie aus.
-- **`/root/wp-cleanup-logs/`** — Protokolle der Bereinigungsläufe. Sie können
-  Pfade, Benutzernamen und Zieldomains enthalten.
+- **`/root/wp-db-credentials.txt`** — written by `wp-rotate-db-passwords`,
+  contains database passwords in clear text. Mode 600, owned by root, and it
+  must never end up in a repository, a ticket or a backup you hand on. The
+  bundled `.gitignore` excludes it.
+- **`/root/wp-cleanup-logs/`** — logs of cleanup runs. They may contain paths,
+  usernames and target domains.
 
-## Eine Schwachstelle melden
+## Reporting a vulnerability
 
-Wenn du in diesen Skripten ein Sicherheitsproblem findest — etwa eine
-Befehlsinjektion über einen Dateinamen, eine unsichere temporäre Datei oder
-eine Rechteausweitung — melde es bitte **nicht** über ein öffentliches Issue.
+If you find a security problem in these scripts — a command injection through
+a filename, an unsafe temporary file, a privilege escalation — please do
+**not** open a public issue.
 
-Nutze stattdessen die private Meldefunktion von GitHub:
-`Security` → `Report a vulnerability`.
+Use GitHub's private reporting instead: `Security` → `Report a vulnerability`.
 
-Bitte gib an:
+Please include:
 
-- welches Skript und welche Version betroffen sind
-- wie sich das Problem reproduzieren lässt
-- was ein Angreifer damit erreichen könnte
+- which script and which version are affected
+- how to reproduce the problem
+- what an attacker could achieve with it
 
-## Was hier nicht hingehört
+## What does not belong here
 
-Dieses Repository ist kein Meldeweg für kompromittierte WordPress-Seiten.
-Wenn deine eigene Website betroffen ist, hilft dir die
-[WordPress-Support-Community](https://wordpress.org/support/) weiter.
+This repository is not a support channel for compromised WordPress sites. If
+your own site is affected, the
+[WordPress support community](https://wordpress.org/support/) is the better
+place.
 
-## Zu den Angreiferdomains
+## About the attacker domains
 
-`blocklist-domains.txt` enthält Domains einer beobachteten Kampagne. Sie sind
-zum Sperren gedacht — rufe sie nicht im Browser auf. Falls eine Domain den
-Besitzer gewechselt hat und zu Unrecht auf der Liste steht, ist ein Issue der
-richtige Weg.
+`blocklist-domains.txt` lists domains from an observed campaign. They are
+meant for blocking — do not open them in a browser. If a domain has changed
+hands and is listed unfairly, an issue is the right way to say so.

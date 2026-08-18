@@ -676,11 +676,12 @@ Im Zweifel neu aufsetzen.
 ## Mitwirken
 
 Rückmeldungen aus echten Vorfällen sind das Wertvollste — besonders
-Fehlalarme und nicht erkannte Varianten. Siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+Fehlalarme und nicht erkannte Varianten. Siehe
+[CONTRIBUTING.md](CONTRIBUTING.md) (englisch).
 
 Sicherheitsprobleme **in diesen Skripten** bitte nicht als öffentliches Issue,
 sondern über die private Meldefunktion von GitHub — siehe
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md) (englisch).
 
 ## Lizenz
 

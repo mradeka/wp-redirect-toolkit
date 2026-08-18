@@ -1,46 +1,46 @@
-# Mitwirken
+# Contributing
 
-Beiträge sind willkommen — besonders Rückmeldungen aus echten Vorfällen:
-Fehlalarme, nicht erkannte Varianten, Umgebungen, in denen etwas nicht läuft.
+Contributions are welcome — especially feedback from real incidents: false
+positives, variants that were not detected, environments where something does
+not run.
 
-## Fehlalarme melden
+## Reporting false positives
 
-Die nützlichste Art von Issue. Die bisherigen Fehlalarme entstanden alle nach
-demselben Muster: eine Muster- oder Namenssuche über Verzeichnisse, deren
-Integrität sich auch per Prüfsumme feststellen lässt. Beispiele aus der
-Vergangenheit: das Theme-Muster `page-coming-soon.php`, die angepasste
-`index.php` bei Unterverzeichnis-Installationen, `class-pclzip.php` im Kern,
-Übersetzungsdateien `*.l10n.php`.
+The most useful kind of issue. Every false positive so far followed the same
+pattern: a name or pattern search across directories whose integrity can also
+be established by checksum. Past examples: the theme pattern
+`page-coming-soon.php`, the adjusted `index.php` in subdirectory installs,
+`class-pclzip.php` in core, translation files `*.l10n.php`.
 
-Bitte gib an:
+Please include:
 
-- welches Skript und welche Meldung
-- den Pfad der Datei (Domain und Benutzername gerne ersetzt)
-- warum die Datei legitim ist, wenn du es weißt
+- which script and which message
+- the path of the file (feel free to replace domain and username)
+- why the file is legitimate, if you know
 
-## Erkennungsmuster ergänzen
+## Adding detection patterns
 
-Ergänzungen an `blocklist-domains.txt` und an den Suchmustern brauchen eine
-Quelle: eigene Beobachtung mit Datum, oder ein öffentlich zugänglicher
-Bericht. Bitte keine Domains auf Verdacht.
+Additions to `blocklist-domains.txt` and to the search patterns need a source:
+your own observation with a date, or a publicly available report. Please no
+domains on suspicion alone.
 
-## Konventionen im Code
+## Code conventions
 
-- **Bash 4+**, `set -uo pipefail`. Kein `set -e`: Die Skripte sollen bei einer
-  fehlgeschlagenen Einzelprüfung weiterlaufen und am Ende berichten.
-- **Trockenlauf ist der Standard.** Jede schreibende Aktion hängt an `--apply`.
-- **Sichern vor Ändern.** Datenbank-Dump oder Dateikopie, bevor etwas
-  überschrieben wird.
-- **Nur eindeutige Funde automatisch bereinigen.** Alles Mehrdeutige wird
-  gemeldet, nicht angefasst. Lieber ein gemeldeter Fund zu viel als eine
-  gelöschte Datei zu wenig.
-- **Prüfsumme vor Mustersuche.** Wo `wp core verify-checksums` oder
-  `wp plugin/theme verify-checksums` greift, ist das die bessere Antwort.
-- **Fehlermeldungen nicht verschlucken.** Kein `2>/dev/null` an Stellen, an
-  denen der Anwender die Ursache braucht.
-- **Kein `--force` ohne Rückfrage** bei Löschungen echter Inhalte.
+- **Bash 4+**, `set -uo pipefail`. No `set -e`: the scripts should continue
+  after a single failed check and report at the end.
+- **Dry run is the default.** Every writing action sits behind `--apply`.
+- **Back up before changing.** A database dump or a file copy before anything
+  is overwritten.
+- **Only clean unambiguous findings automatically.** Anything ambiguous is
+  reported, not touched. One reported finding too many beats one deleted file
+  too few.
+- **Checksums before pattern matching.** Where `wp core verify-checksums` or
+  `wp plugin/theme verify-checksums` applies, that is the better answer.
+- **Do not swallow error messages.** No `2>/dev/null` where the user needs the
+  cause.
+- **No `--force` without a prompt** when deleting real content.
 
-## Vor dem Pull Request
+## Before opening a pull request
 
 ```bash
 for f in *.sh; do bash -n "$f"; done
@@ -48,18 +48,18 @@ shellcheck -S warning *.sh
 for f in *.sh; do [ "$f" = install.sh ] || bash "$f" --help >/dev/null; done
 ```
 
-Dieselben drei Schritte laufen in der CI. Neue Erkennungslogik bitte gegen
-eine kleine Testumgebung prüfen und das Ergebnis im Pull Request zeigen —
-sowohl den erkannten Fall als auch einen legitimen Gegenfall.
+The same three steps run in CI. For new detection logic, please test against a
+small fixture tree and show the result in the pull request — both the detected
+case and a legitimate counter-example.
 
-## Sprache
+## Language
 
-**Code, Kommentare, Optionsnamen und alle Ausgabetexte auf Englisch.** Das gilt
-auch für Fehlermeldungen und Hilfetexte — wer das Werkzeug installiert, soll
-nicht auf deutschsprachige Meldungen stoßen.
+**Code, comments, option names and all output are English.** That includes
+error messages and help text — someone installing the toolkit should not run
+into German messages.
 
-Dokumentation: `README.md` ist englisch und die maßgebliche Fassung.
-`README.de.md` ist die deutsche Übersetzung. Ändert sich eine Option, gehören
-beide angepasst. `INSTALL.md`, `INCIDENT.md` und das Wiki sind deutsch.
+Documentation: `README.md` is English and authoritative. `README.de.md` is the
+German translation; when an option changes, both need updating. `INSTALL.md`,
+`INCIDENT.md` and the wiki are German.
 
-Issues und Pull Requests gerne in beiden Sprachen.
+Issues and pull requests are welcome in either language.
