@@ -8,32 +8,31 @@
 #  Rechte: 644, Eigentuemer = Seitenbenutzer
 # ============================================================================
 
-# Keine Ausfuehrung von Skripten in diesem Verzeichnis und darunter
-<FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
+# WICHTIG bei mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
+# Dort laeuft PHP ueber "AddHandler fcgid-script .php" aus dem vhost. Ein
+# "AddType text/plain .php" hier ueberschreibt die Zuordnung und bricht die
+# PHP-Verarbeitung im ganzen Verzeichnisbaum - Uploads im Backend scheitern
+# dann mit "The uploaded file could not be moved to wp-content/uploads/...".
+# Richtig ist RemoveHandler: es entfernt die Zuordnung nur fuer dieses
+# Verzeichnis.
+<IfModule mod_mime.c>
+    RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.0 .php8.1 .php8.2 .php8.3 .php8.4 .phtml .phps .phar .pht
+</IfModule>
+
+# Zusaetzlich der direkte Zugriffsschutz. Nur Skript-Endungen - Bilder, PDFs
+# und alles andere bleiben abrufbar.
+<FilesMatch "\.(php|php[0-9]|php[0-9]\.[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
     Require all denied
 </FilesMatch>
 
-# Doppelte Endungen: "bild.php.jpg" endet zwar auf .jpg, kann aber auf
-# Servern, die PHP ueber mod_mime anhand einer beliebigen Endung im Namen
-# zuordnen, trotzdem ausgefuehrt werden. Deshalb jede Datei sperren, die
-# eine Skript-Endung IRGENDWO im Namen traegt.
+# Doppelte Endungen ("bild.php.jpg") werden auf manchen Servern trotzdem als
+# PHP ausgefuehrt - deshalb jede Skript-Endung IRGENDWO im Namen sperren.
 <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)\.">
     Require all denied
 </FilesMatch>
 
-# Selbst wenn eine Datei durchrutscht: als Text ausliefern, nicht ausfuehren
-AddType text/plain .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-
-# Handler-Zuordnung fuer PHP in diesem Verzeichnis vollstaendig aufheben
-<IfModule mod_mime.c>
-    RemoveHandler .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-    RemoveType    .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-</IfModule>
-
 # Nur -Indexes: -ExecCGI und -Includes braeuchten "AllowOverride Options",
-# das viele Panels nicht gewaehren - dann liefert Apache 500 fuer das ganze
-# Verzeichnis. Die PHP-Ausfuehrung ist oben bereits ueber FilesMatch, AddType
-# und RemoveHandler unterbunden; dafuer genuegt AllowOverride FileInfo.
+# das viele Panels nur mit einer Whitelist gewaehren.
 Options -Indexes
 
 # SVG-Dateien werden im Browser ausgefuehrt und koennen JavaScript enthalten.

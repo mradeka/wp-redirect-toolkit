@@ -206,11 +206,17 @@ RewriteRule . /index.php [L]
 #  greift: doppelt haelt besser, und diese Datei wirkt selbst dann, wenn die
 #  Hauptdatei einmal ueberschrieben wird.
 #
-#      <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)$">
+#      <IfModule mod_mime.c>
+#          RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.3 .phtml .phps .phar
+#      </IfModule>
+#      <FilesMatch "\.(php|php[0-9]|php[0-9]\.[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)$">
 #          Require all denied
 #      </FilesMatch>
-#      Options -Indexes -ExecCGI
-#      AddType text/plain .php .phtml .phps
+#      Options -Indexes
+#
+#  KEIN "AddType text/plain .php" verwenden: bei mod_fcgid ueberschreibt das
+#  die Handler-Zuordnung aus dem vhost und bricht die PHP-Verarbeitung im
+#  ganzen Baum - Uploads scheitern dann mit "could not be moved".
 #
 #
 #  wp-includes/.htaccess  (optional)

@@ -220,28 +220,32 @@ WPB
 uploads_rules() {
 cat <<'UPL'
 # ---- erzeugt von wp-harden-htaccess ---------------------------------------
-# Keine Ausfuehrung hochgeladener Skripte - zweite Verteidigungslinie.
-<FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
+# Keine Ausfuehrung hochgeladener Skripte.
+#
+# WICHTIG bei mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
+# Dort laeuft PHP ueber "AddHandler fcgid-script .php" aus dem vhost. Ein
+# "AddType text/plain .php" in dieser Datei ueberschreibt die Zuordnung und
+# bricht die PHP-Verarbeitung im ganzen Verzeichnisbaum - Uploads scheitern
+# dann mit "could not be moved". Richtig ist RemoveHandler: es entfernt die
+# Zuordnung nur fuer dieses Verzeichnis.
+<IfModule mod_mime.c>
+    RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.0 .php8.1 .php8.2 .php8.3 .php8.4 .phtml .phps .phar .pht
+</IfModule>
+
+# Zusaetzlich der direkte Zugriffsschutz. Nur auf Skript-Endungen - Bilder,
+# PDFs und alles andere bleiben abrufbar.
+<FilesMatch "\.(php|php[0-9]|php[0-9]\.[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
     Require all denied
 </FilesMatch>
 
-# Doppelte Endungen ("bild.php.jpg") werden auf manchen Servern trotzdem
-# als PHP ausgefuehrt - deshalb jede Skript-Endung IRGENDWO im Namen sperren.
+# Doppelte Endungen ("bild.php.jpg") werden auf manchen Servern trotzdem als
+# PHP ausgefuehrt - deshalb jede Skript-Endung IRGENDWO im Namen sperren.
 <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)\.">
     Require all denied
 </FilesMatch>
 
-AddType text/plain .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-
-<IfModule mod_mime.c>
-    RemoveHandler .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-    RemoveType    .php .phtml .phps .php3 .php4 .php5 .php7 .phar
-</IfModule>
-
-# Bewusst nur -Indexes: -ExecCGI/-Includes braeuchten ebenfalls
-# "AllowOverride Options". Die PHP-Ausfuehrung wird oben ueber FilesMatch,
-# AddType und RemoveHandler unterbunden - dafuer genuegt AllowOverride
-# FileInfo, das praktisch ueberall gesetzt ist.
+# Bewusst nur -Indexes: -ExecCGI/-Includes braeuchten "AllowOverride Options",
+# das viele Panels nur mit einer Whitelist gewaehren.
 Options -Indexes
 UPL
 }
