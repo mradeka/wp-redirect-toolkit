@@ -136,6 +136,47 @@ WordPress seine Embed-Caches gegen die Schaddomain:
 Maschinell erzeugt, kein eigener Text — wird als vierter Durchgang
 herausgeschnitten.
 
+**mod_php serverweit aktiviert — zwei Tage nach dem Vorfall.** In
+`/etc/apache2/mods-enabled/` tauchten `php8.3.load` und `php8.3.conf` mit dem
+Datum des zweiten Tages nach dem Einbruch auf. Der Host arbeitet eigentlich
+mit `mod_fcgid` und suexec, sodass PHP unter dem jeweiligen Seitenbenutzer
+läuft. `mod_php` setzt das per `SetHandler` ausser Kraft — danach lief PHP auf
+**allen** Seiten als `www-data`.
+
+Die Auswirkungen waren zunächst schwer zuzuordnen, weil sie wie drei
+unabhängige Probleme aussahen:
+
+- Medien-Uploads scheiterten mit „The uploaded file could not be moved to
+  wp-content/uploads/…"
+- WordPress fragte bei Aktualisierungen wieder nach FTP-Zugangsdaten
+- `WP_DEBUG_LOG` legte keine Datei an
+
+Alle drei haben dieselbe Ursache: Der PHP-Prozess war nicht mehr Eigentümer
+der Dateien. Sicherheitlich ist die Änderung erheblicher als der reine
+Betriebsausfall — sie hebt die Trennung zwischen den Seiten auf. Unter
+`mod_php` teilen sich alle Domains eine Prozessidentität, sodass Code einer
+kompromittierten Seite auf die Dateien aller anderen zugreifen kann.
+
+Ob die Module bewusst durch eigene Arbeit aktiviert wurden oder nicht, war zum
+Zeitpunkt des Berichts nicht abschliessend geklärt. Prüfschritte:
+
+```bash
+grep -i 'php8' /var/log/apt/history.log | tail
+ls -la /etc/apache2/mods-enabled/php*.*
+```
+
+Behoben mit:
+
+```bash
+a2dismod php8.3 && apachectl configtest && systemctl restart apache2
+```
+
+Kontrolle, dass PHP wieder unter dem Seitenbenutzer läuft:
+
+```php
+<?php echo posix_getpwuid(posix_geteuid())['name'];
+```
+
 **Datenbank-Dumps im Webverzeichnis.** Unter `public_html/wordpress/tmp/` lagen
 `.sql`-Sicherungen — über den Browser abrufbar und mit Passwort-Hashes darin.
 Seither prüft das Skript den Webroot auf Dumps, Archive und phar-Dateien.
@@ -245,6 +286,7 @@ Ports explizit freigeben — 22, 80, 443, 25 und weitere — und jede Regel für
 | `grep: binary file matches` | Logdatei enthält Binärzeichen → `grep -a` |
 | Seite ohne Formatierung | `home`/`siteurl` verbogen |
 | Weiterleitung trotz sauberem `curl` | Browsercache |
+| Upload scheitert, Updates fragen nach FTP | `mod_php` aktiv statt fcgid → PHP läuft als `www-data` |
 | Firewall-Regel sperrt eigenen Zugang | Default-Deny, und IPv4/IPv6 getrennt gepflegt |
 
 ## 8. Indikatoren

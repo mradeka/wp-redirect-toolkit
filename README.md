@@ -519,6 +519,7 @@ klassifiziert**:
 |---|---|
 | `php-handler` | immer übernommen, auch mit `--strict` |
 | `gefaehrlich` (`auto_prepend_file`, `auto_append_file`, `eval(`) | **nie** übernommen, wird gemeldet |
+| `options-risiko` (jede `Options`-Zeile außer `Options -Indexes`) | **nie** übernommen — braucht `AllowOverride Options`, sonst liefert Apache 500 |
 | `externe-weiterleitung`, `rewrite`, `zugriff`, `standard`, `weiterleitung` | übernommen, mit `--strict` verworfen |
 | `unbekannt` | übernommen, mit `--strict` verworfen — vorher ansehen |
 
