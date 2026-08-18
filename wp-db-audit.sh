@@ -146,6 +146,6 @@ if [[ ${#DIRTY_SITES[@]} -eq 0 ]]; then
 else
   printf '\033[31mSites with findings:\033[0m\n'
   for d in "${DIRTY_SITES[@]}"; do printf '  %s\n' "$d"; done
-  printf '\nNext: wp-redirect-cleanup --path <site> --wp-bin <wp> --backup <dir>\nDateisystem separat pruefen: wp-asset-scan\n'
+  printf '\nNext: wp-redirect-cleanup --path <site> --wp-bin <wp> --backup <dir>\nCheck the filesystem separately: wp-asset-scan\n'
 fi
 exit $FOUND_ANY

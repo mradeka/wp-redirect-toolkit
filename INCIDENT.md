@@ -5,6 +5,8 @@ Virtualmin/Webmin mit Jailkit, rund dreißig Domains und zehn
 WordPress-Installationen unter `/home/<benutzer>/public_html[/wordpress]`.
 Zeitraum: August 2026.
 
+Dieser Bericht ist deutsch; die Skriptausgaben sind englisch.
+
 Alle eigenen Domains, Benutzernamen und Adressen sind in diesem Bericht durch
 Platzhalter ersetzt. Die Angreiferdomains stehen im Klartext, damit sie
 blockiert werden können — siehe [Indikatoren](#indikatoren).
@@ -214,6 +216,26 @@ besteht aus zwei Anweisungen. Alles darueber hinaus — nachgeladener Code,
 Weiterleitungen, abweichende Include-Ziele, mehr als 15 Zeilen — ist ein
 Befund.
 
+**Root-eigene Dateien nach Reparaturarbeiten.** Auf mehreren Installationen
+gehörte der komplette WordPress-Kern anschließend root statt dem
+Seitenbenutzer — Folge eines `wp core download` bzw. eines Skriptlaufs als
+root. Die Symptome wirken wie getrennte Probleme, haben aber dieselbe Ursache:
+
+| Betroffener Bereich | Symptom |
+|---|---|
+| Kern (`wp-admin`, `wp-includes`, Wurzel) | Aktualisierungen fragen nach FTP-Zugangsdaten |
+| `wp-content/uploads` | Medien-Uploads scheitern |
+| generierte Theme-Assets | Seite verliert ihre Formatierung |
+
+Uploads und Updates brechen unabhängig voneinander: Für Uploads genügt
+Schreibrecht in `uploads/`, für Updates muss der gesamte Kern dem
+Seitenbenutzer gehören. Eine Seite konnte deshalb Dateien hochladen und
+trotzdem nach FTP fragen.
+
+Seither prüft `wp-fix-ownership` das über alle Seiten hinweg und weist den
+betroffenen Bereich aus. Zur Nachkontrolle ruft es `get_filesystem_method()`
+auf — dieselbe Funktion, mit der WordPress über die FTP-Abfrage entscheidet.
+
 **Mailversand unauffällig.** `mailq` leer, keine Hinweise auf Missbrauch als
 Spam-Relais.
 
@@ -287,6 +309,8 @@ Ports explizit freigeben — 22, 80, 443, 25 und weitere — und jede Regel für
 | Seite ohne Formatierung | `home`/`siteurl` verbogen |
 | Weiterleitung trotz sauberem `curl` | Browsercache |
 | Upload scheitert, Updates fragen nach FTP | `mod_php` aktiv statt fcgid → PHP läuft als `www-data` |
+| Upload geht, Update fragt trotzdem nach FTP | Kern gehört root, `uploads` dem Seitenbenutzer |
+| `Option FollowSymLinks not allowed here` | `AllowOverride`-Whitelist des Panels enthält sie nicht |
 | Firewall-Regel sperrt eigenen Zugang | Default-Deny, und IPv4/IPv6 getrennt gepflegt |
 
 ## 8. Indikatoren
@@ -396,7 +420,8 @@ Zwei Konsequenzen fuer die Werkzeuge:
       Notebook?)
 - [ ] Private SSH-Schlüssel vom Server entfernen, Schlüsselpaare erneuern
 - [ ] Passwörter aller Panel-Konten wechseln, nicht nur root
-- [ ] Kontrolllauf `wp-db-audit` nach einer Stunde und am Folgetag
+- [ ] Kontrolllauf `wp-db-audit` und `wp-asset-scan` nach einer Stunde und am
+      Folgetag
 
 Steigt die Fundzahl wieder, besteht der Zugang weiter — dann die Seite offline
 nehmen statt erneut zu bereinigen.

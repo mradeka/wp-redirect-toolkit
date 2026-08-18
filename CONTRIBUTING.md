@@ -54,6 +54,12 @@ sowohl den erkannten Fall als auch einen legitimen Gegenfall.
 
 ## Sprache
 
-Code, Kommentare und Optionsnamen auf Englisch; Ausgabetexte und Dokumentation
-auf Deutsch, wie im Bestand. Bei gemischten Dateien am jeweiligen Umfeld
-orientieren.
+**Code, Kommentare, Optionsnamen und alle Ausgabetexte auf Englisch.** Das gilt
+auch für Fehlermeldungen und Hilfetexte — wer das Werkzeug installiert, soll
+nicht auf deutschsprachige Meldungen stoßen.
+
+Dokumentation: `README.md` ist englisch und die maßgebliche Fassung.
+`README.de.md` ist die deutsche Übersetzung. Ändert sich eine Option, gehören
+beide angepasst. `INSTALL.md`, `INCIDENT.md` und das Wiki sind deutsch.
+
+Issues und Pull Requests gerne in beiden Sprachen.

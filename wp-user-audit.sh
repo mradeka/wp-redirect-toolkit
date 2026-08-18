@@ -104,7 +104,7 @@ for CONFIG in "${CONFIGS[@]}"; do
         for (i=2; i<=NF; i++) gsub(/^[ \t]+|[ \t]+$/, "", $i);
         if ($2 != "") print $2 "," $3 "," $5 "," $7 "," $6
       }')
-    [[ -n "$USERS" ]] && printf '\033[33m  (CSV-Ausgabe nicht verfuegbar - Tabelle ausgewertet; WP-CLI veraltet)\033[0m\n'
+    [[ -n "$USERS" ]] && printf '\033[33m  (CSV output unavailable - parsed the table; WP-CLI outdated)\033[0m\n'
   fi
 
   if [[ -z "$USERS" ]]; then
@@ -173,7 +173,7 @@ for CONFIG in "${CONFIGS[@]}"; do
 
   printf '\033[31m\n  => %d verdaechtige(s) Konto/Konten\033[0m\n' "${#SUSPECT_IDS[@]}"
 
-  [[ $DELETE -eq 0 ]] && { printf '  (Nur Bericht. Loeschen mit --delete, dann wird je Konto gefragt.)\n'; continue; }
+  [[ $DELETE -eq 0 ]] && { printf '  (Report only. Use --delete to remove, with a prompt per account.)\n'; continue; }
 
   for i in "${!SUSPECT_IDS[@]}"; do
     ID="${SUSPECT_IDS[$i]}"; LOGIN="${SUSPECT_LOGINS[$i]}"
@@ -188,9 +188,9 @@ for CONFIG in "${CONFIGS[@]}"; do
     read -r -p "  Konto ${LOGIN} auf ${WP_PATH} loeschen? [y/N] " ANS
     if [[ "${ANS,,}" == "y" ]]; then
       if [[ -n "$REASSIGN" ]]; then
-        $WP user delete "$ID" --reassign="$REASSIGN" --yes && printf '\033[32m    geloescht, Inhalte an ID %s uebertragen\033[0m\n' "$REASSIGN"
+        $WP user delete "$ID" --reassign="$REASSIGN" --yes && printf '\033[32m    deleted, content reassigned to ID %s\033[0m\n' "$REASSIGN"
       else
-        $WP user delete "$ID" --yes && printf '\033[32m    geloescht\033[0m\n'
+        $WP user delete "$ID" --yes && printf '\033[32m    deleted\033[0m\n'
       fi
     else
       printf '    uebersprungen\n'
@@ -200,8 +200,8 @@ done
 
 if [[ $SHUFFLE -eq 1 ]]; then
   printf '\n\033[1m===== AUTH-SALTS ERNEUERN =====\033[0m\n'
-  printf 'Betrifft %d Installation(en). Alle angemeldeten Sitzungen werden ungueltig -\n' "${#SHUFFLE_TARGETS[@]}"
-  printf 'auch deine eigenen. Passwoerter bleiben unveraendert.\n\n'
+  printf 'Affects %d installation(s). All active sessions become invalid -\n' "${#SHUFFLE_TARGETS[@]}"
+  printf 'including your own. Passwords remain unchanged.\n\n'
   for T in "${SHUFFLE_TARGETS[@]}"; do printf '  %s\n' "${T##*|}"; done
 
   DO=1
@@ -225,12 +225,12 @@ if [[ $SHUFFLE -eq 1 ]]; then
         sudo -u "$U" -H rm -f "$BK"
         OKC=$((OKC+1))
       else
-        printf '\033[31m  [fehlgeschlagen] %s (Sicherung: %s)\033[0m\n' "$P" "$BK"
+        printf '\033[31m  [failed] %s (backup: %s)\033[0m\n' "$P" "$BK"
         FAILC=$((FAILC+1))
       fi
     done
     printf '\n  %d erneuert, %d fehlgeschlagen\n' "$OKC" "$FAILC"
-    printf '  Melde dich jetzt neu an. Bleiben Seiten unerreichbar, wp-config.php pruefen.\n'
+    printf '  Log in again now. If sites stay unreachable, check wp-config.php.\n'
   fi
 fi
 

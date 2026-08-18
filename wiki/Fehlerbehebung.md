@@ -274,7 +274,7 @@ nennt genau die Datei und Zeile, die die Navigation ausgelöst hat.
 ## Selbsterkennung bricht ab
 
 ```
-Selbsterkennung nicht verwertbar: 'DOMAIN' steckt in home UND siteurl
+auto-detection unusable: 'DOMAIN' appears in home AND siteurl
 ```
 
 Entweder sind beide Optionen gekapert — dann gibt es keinen sauberen Wert zum
@@ -341,6 +341,21 @@ apachectl configtest && systemctl restart apache2
 > ls -la /etc/apache2/mods-enabled/php*.*
 > grep -i php8 /var/log/apt/history.log | tail
 > ```
+
+**Zweite mögliche Ursache: root-eigene Dateien.** Läuft PHP unter dem
+richtigen Benutzer, fragt WordPress aber trotzdem nach FTP, gehört der Kern
+vermutlich root — etwa nach einem `wp core download` als root. Prüfen und
+korrigieren:
+
+```bash
+sudo wp-fix-ownership --report     # Übersicht über alle Seiten
+sudo wp-fix-ownership              # interaktiv korrigieren
+```
+
+Uploads und Updates brechen dabei unabhängig voneinander: Für Uploads genügt
+Schreibrecht in `uploads/`, für Updates muss der gesamte Kern dem
+Seitenbenutzer gehören. Eine Seite kann also Dateien hochladen und trotzdem
+nach FTP fragen.
 
 Zeigt der Test den richtigen Benutzer, `uploads` aber trotzdem als nicht
 schreibbar, prüfe den **Monatsordner** statt des Elternverzeichnisses — ein

@@ -71,7 +71,7 @@ mapfile -t CONFIGS < <(
   ls -d /home/*/public_html/wordpress/wp-config.php \
         /home/*/public_html/wp-config.php 2>/dev/null | sort -u
 )
-[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "Keine WordPress-Installationen gefunden."; exit 0; }
+[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "No WordPress installations found."; exit 0; }
 
 declare -A USER_PATHS USER_HOST USER_DB
 SKIPPED=()
@@ -95,8 +95,8 @@ for CONFIG in "${CONFIGS[@]}"; do
   DBNAME=$(getdef DB_NAME "$CONFIG")
   DBHOST=$(getdef DB_HOST "$CONFIG")
   if [[ -z "$DBUSER" ]]; then
-    warn "DB_USER nicht lesbar in ${CONFIG} - uebersprungen"
-    printf '        gefundene define-Zeilen: %s\n' "$(grep -c 'define' "$CONFIG" 2>/dev/null)"
+    warn "DB_USER not readable in ${CONFIG} - skipped"
+    printf '        define lines found: %s\n' "$(grep -c 'define' "$CONFIG" 2>/dev/null)"
     grep -m1 'DB_USER' "$CONFIG" 2>/dev/null | sed 's/^/        /'
     SKIPPED+=("$CONFIG")
     continue
@@ -116,13 +116,13 @@ done
 printf '\n  %d Datenbankbenutzer, %d von %d Installation(en) erfasst\n' \
        "${#USER_PATHS[@]}" "$COVERED" "${#CONFIGS[@]}"
 if [[ ${#SKIPPED[@]} -gt 0 ]]; then
-  warn "${#SKIPPED[@]} Installation(en) uebersprungen - dort wurde DB_USER nicht erkannt:"
+  warn "${#SKIPPED[@]} installation(s) skipped - DB_USER not detected there:"
   for S in "${SKIPPED[@]}"; do printf '        %s\n' "$S"; done
 fi
 
 for U in "${!USER_PATHS[@]}"; do
   N=$(echo -n "${USER_PATHS[$U]}" | grep -c .)
-  [[ "$N" -gt 1 ]] && warn "DB-Benutzer '${U}' wird von ${N} Installationen genutzt - wird gemeinsam rotiert"
+  [[ "$N" -gt 1 ]] && warn "DB user '${U}' is used by ${N} installations - rotated jointly"
 done
 
 if [[ $APPLY -eq 0 ]]; then
@@ -238,11 +238,11 @@ for DBUSER in "${!USER_PATHS[@]}"; do
       mysql $MYSQL_OPTS -e "FLUSH PRIVILEGES;" >/dev/null 2>&1
       printf '    altes MySQL-Passwort wiederhergestellt\n'
     fi
-    echo "ROLLBACK: ${DBUSER} - Passwort NICHT geaendert" >> "$CREDFILE"
+    echo "ROLLBACK: ${DBUSER} - password NOT changed" >> "$CREDFILE"
     FAILC=$((FAILC+1))
   else
     for BP in "${BACKUPS[@]}"; do rm -f "${BP##*|}"; done   # backups hold the OLD password
-    ok "wp-config.php aktualisiert und Verbindung geprueft (${#PATHS[@]}x)"
+    ok "wp-config.php updated and connection verified (${#PATHS[@]}x)"
     OKC=$((OKC+1))
   fi
   unset BACKUPS

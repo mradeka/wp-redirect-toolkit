@@ -3,6 +3,32 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Geändert
+
+- Alle Skriptausgaben, Hilfetexte und Kommentare auf **Englisch** umgestellt
+- `README.md` ist jetzt englisch; die deutsche Fassung liegt als
+  `README.de.md` daneben
+- Klassifikationsbezeichner in `wp-harden-htaccess` englisch
+  (`dangerous`, `options-risk`, `external-redirect`, `unknown` …)
+
+### Hinzugefügt
+
+- `wp-fix-ownership` — Datei-Eigentümer prüfen und interaktiv korrigieren
+- `wp-harden-htaccess` — abgesicherte `.htaccess` ausrollen, mit Inventar,
+  Klassifikation übernommener Regeln und automatischem Rollback
+- `.gitattributes` erzwingt LF-Zeilenenden für Shell-Skripte
+
+### Behoben
+
+- `Options +FollowSymLinks` aus allen `.htaccess`-Vorlagen entfernt — benötigt
+  `AllowOverride Options`, was Panels meist nicht gewähren; führte zu 500
+- `AddType text/plain .php` durch `RemoveHandler` ersetzt — brach bei fcgid
+  die PHP-Verarbeitung im ganzen Verzeichnisbaum
+- Rollback in `wp-harden-htaccess` prüft jetzt auch ein Asset im
+  Kernverzeichnis, nicht nur die Startseite
+
 ## [1.0.0] — 2026-08-16
 
 Erste Veröffentlichung. Entstanden während eines realen Vorfalls; alle

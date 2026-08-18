@@ -15,6 +15,7 @@ Elf Skripte. Alle laufen ohne `--apply` als Trockenlauf, alle unterstützen
 | [`wp-harden-htaccess`](#wp-harden-htaccess) | Abgesicherte `.htaccess` ausrollen | nur `--apply` | root |
 | [`wp-move-to-subdir`](#wp-move-to-subdir) | Umzug nach `public_html/wordpress/` | nur `--apply` | root |
 | [`apply-blocklist`](#apply-blocklist) | Domains sperren oder suchen | nur `--apply` | root |
+| [`wp-fix-ownership`](#wp-fix-ownership) | Datei-Eigentümer prüfen und korrigieren | nur nach Auswahl | root |
 | [`check-usrlocalbin-access`](#check-usrlocalbin-access) | Nutzbarkeit je Konto | nein | root |
 
 ---
@@ -196,10 +197,13 @@ Jede Zeile wird klassifiziert:
 | Kategorie | Behandlung |
 |---|---|
 | `php-handler` | immer übernommen, auch mit `--strict` |
-| `gefaehrlich` (`auto_prepend_file`, `eval(`) | **nie** übernommen |
-| `options-risiko` (jede `Options`-Zeile außer `Options -Indexes`) | **nie** übernommen |
-| `rewrite`, `zugriff`, `standard`, `weiterleitung` | übernommen, mit `--strict` verworfen |
-| `unbekannt` | übernommen, mit `--strict` verworfen |
+| `dangerous` (`auto_prepend_file`, `auto_append_file`, `eval(`) | **nie** übernommen |
+| `options-risk` (jede `Options`-Zeile außer `Options -Indexes`) | **nie** übernommen — braucht `AllowOverride Options`, sonst liefert Apache 500 |
+| `rewrite`, `access`, `standard`, `redirect`, `external-redirect` | übernommen, mit `--strict` verworfen |
+| `unknown` | übernommen, mit `--strict` verworfen |
+
+> Die Kategorienamen erscheinen so auch in der Ausgabe von `--inventory`.
+> Die Skriptausgaben sind durchgehend englisch, diese Dokumentation deutsch.
 
 Absicherungen: Sicherung nach `/root/htaccess-backups`, `apachectl
 configtest`, HTTP-Status vor und nach der Änderung mit automatischem Rollback,
@@ -240,6 +244,41 @@ Per DNS sperren, nicht per IP — die Domains liegen hinter CDN-Adressen, die
 mit tausenden legitimen Seiten geteilt werden.
 
 ---
+
+## wp-fix-ownership
+
+```bash
+sudo wp-fix-ownership              # prüfen, dann interaktiv auswählen
+sudo wp-fix-ownership --report     # nur prüfen
+sudo wp-fix-ownership --all --yes
+sudo wp-fix-ownership --no-chmod   # nur Eigentümer, Rechte unverändert
+```
+
+Auswahl per Nummer: einzeln `2 5 7`, Bereich `2-5`, gemischt `1 3-5 8`, alle
+`a`, abbrechen `q`.
+
+Läuft ein `wp core download`, ein Update oder ein Skript versehentlich als
+root, gehören die Dateien danach root. Die Symptome wirken wie getrennte
+Probleme:
+
+| Bereich | Symptom |
+|---|---|
+| Kern (`wp-admin`, `wp-includes`, Wurzel) | Aktualisierungen fragen nach FTP-Zugangsdaten |
+| `wp-content/uploads` | Medien-Uploads scheitern |
+| generierte Theme-Assets (`uploads/dynamic_avia/`) | Seite verliert ihre Formatierung |
+
+Uploads und Updates brechen unabhängig voneinander: Für Uploads genügt
+Schreibrecht in `uploads/`, für Updates muss der gesamte Kern dem
+Seitenbenutzer gehören. Eine Seite kann also Dateien hochladen und trotzdem
+nach FTP fragen — deshalb weist die Übersicht den betroffenen Bereich aus.
+
+Zur Nachkontrolle wird `get_filesystem_method()` aufgerufen — dieselbe
+Funktion, mit der WordPress über die FTP-Abfrage entscheidet. `direct`
+bedeutet: Aktualisierungen laufen wieder durch.
+
+> `--no-chmod` verwenden, wenn eigene Skripte mit Ausführungsbit im
+> Verzeichnis liegen. Sonst werden Rechte auf 755/644 vereinheitlicht; vorher
+> ausführbare Dateien werden nach `/root` protokolliert.
 
 ## check-usrlocalbin-access
 

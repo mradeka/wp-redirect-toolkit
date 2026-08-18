@@ -2,37 +2,37 @@
 #
 # wp-harden-htaccess.sh
 #
-# Legt eine abgesicherte .htaccess in jeder WordPress-Installation unter
-# /home/<benutzer>/public_html[/wordpress] an - plus eine zweite in
-# wp-content/uploads/, die die Ausfuehrung hochgeladener Skripte verhindert.
+# Writes a hardened .htaccess into every WordPress install under
+# /home/<user>/public_html[/wordpress] - plus a second one in
+# wp-content/uploads/ that prevents execution of uploaded scripts.
 #
-# Warum das riskanter ist als die uebrigen Skripte, und was dagegen getan wird:
-# Eine fehlerhafte .htaccess nimmt die Seite sofort vom Netz. Deshalb
-#   1. wird die vorhandene Datei gesichert,
-#   2. werden eigene Rewrite-Regeln uebernommen statt ueberschrieben,
-#   3. wird das Layout erkannt (Webroot oder Unterverzeichnis) und die
-#      RewriteBase entsprechend gesetzt,
-#   4. wird der HTTP-Status VOR und NACH der Aenderung gemessen und bei
-#      Verschlechterung automatisch zurueckgerollt.
+# Why this is riskier than the other scripts, and what is done about it:
+# A broken .htaccess takes the site offline immediately. Therefore
+#   1. the existing file is backed up,
+#   2. custom rewrite rules are carried over instead of overwritten,
+#   3. the layout is detected (webroot or subdirectory) and RewriteBase
+#      is set accordingly,
+#   4. the HTTP status is measured BEFORE and AFTER the change, with an
+#      automatic rollback if it gets worse.
 #
-# DRY RUN, solange --apply fehlt.
+# DRY RUN unless --apply is given.
 #
 # Usage:
-#   ./wp-harden-htaccess.sh --inventory          # ZUERST: was steht ueberhaupt drin?
-#   ./wp-harden-htaccess.sh                      # Trockenlauf
+#   ./wp-harden-htaccess.sh --inventory          # FIRST: what is actually in there?
+#   ./wp-harden-htaccess.sh                      # dry run
 #   ./wp-harden-htaccess.sh --only siteuser
 #   ./wp-harden-htaccess.sh --apply
-#   ./wp-harden-htaccess.sh --apply --strict     # nur PHP-Handler uebernehmen
-#   ./wp-harden-htaccess.sh --apply --no-xmlrpc-block   # XML-RPC offen lassen
-#   ./wp-harden-htaccess.sh --restore            # letzte Sicherung zurueckspielen
+#   ./wp-harden-htaccess.sh --apply --strict     # carry over PHP handlers only
+#   ./wp-harden-htaccess.sh --apply --no-xmlrpc-block   # leave XML-RPC open
+#   ./wp-harden-htaccess.sh --restore            # restore the last backup
 #
-# Warum die vorhandenen Dateien nicht einfach geloescht werden:
-# Bei fcgid-Sites steht die PHP-Version in der .htaccess (AddHandler/AddType).
-# Faellt die Zeile weg, laeuft die Seite mit der Server-Vorgabe - oder PHP wird
-# gar nicht mehr ausgefuehrt und der Browser laedt den Quelltext herunter.
-# Umgekehrt darf auch nicht blind alles uebernommen werden: nach einem Vorfall
-# kann dort eine eingeschleuste Regel stehen. Deshalb wird jede Zeile
-# klassifiziert - siehe --inventory.
+# Why existing files are not simply deleted:
+# On fcgid sites the PHP version lives in .htaccess (AddHandler/AddType).
+# If that line disappears the site falls back to the server default - or PHP
+# stops running entirely and the browser downloads the source.
+# Conversely, nothing may be carried over blindly either: after an incident
+# an injected rule may sit in there. Every line is therefore classified
+# - see --inventory.
 
 set -uo pipefail
 
@@ -54,29 +54,29 @@ while [[ $# -gt 0 ]]; do
     --no-xmlrpc-block)  BLOCK_XMLRPC=0; shift ;;
     --backup-dir)       BACKUP_DIR="$2"; shift 2 ;;
     -h|--help)          sed -n '2,36p' "$0"; exit 0 ;;
-    *) echo "Unbekannte Option: $1"; exit 1 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
 # ---------------------------------------------------------------------------
-# Klassifikation eigener Regeln
+# Classification of custom rules
 #
-# Warum nicht einfach alles uebernehmen: Nach einem Vorfall kann in einer
-# .htaccess auch eine eingeschleuste Regel stehen. Warum nicht einfach alles
-# loeschen: Bei fcgid-Sites steht dort die PHP-Version. Faellt die Zeile weg,
-# laeuft die Seite mit der Server-Vorgabe - oder PHP wird gar nicht mehr
-# ausgefuehrt und der Browser laedt den Quelltext herunter.
+# Why not carry everything over: after an incident an injected rule may sit
+# in a .htaccess. Why not delete everything: on fcgid sites the PHP version
+# lives there. If that line disappears the site runs with the server
+# default - or PHP stops running entirely and the browser downloads the
+# source.
 # ---------------------------------------------------------------------------
 classify_line() {
   local L="$1"
   case "$L" in
-    ''|'#'*) echo "kommentar"; return ;;
+    ''|'#'*) echo "comment"; return ;;
   esac
   # 1. Eindeutig boesartig - ZUERST pruefen. "php_value auto_prepend_file"
   #    sieht sonst wie ein harmloser PHP-Handler aus und wuerde uebernommen,
   #    obwohl genau darueber Schadcode bei jedem Aufruf nachgeladen wird.
   if grep -qiE 'auto_prepend_file|auto_append_file|base64_decode|eval\(|include_path\s*=|\bpython\b|\bperl\b.*-e' <<<"$L"; then
-    echo "gefaehrlich"; return
+    echo "dangerous"; return
   fi
   # 2. Muss erhalten bleiben - sonst bricht PHP oder die Panel-Konfiguration
   if grep -qiE '^\s*(AddHandler|AddType|FCGIWrapper|Action|SetHandler|php_value|php_admin_value|php_flag|php_admin_flag|suPHP)' <<<"$L"; then
@@ -84,7 +84,7 @@ classify_line() {
   fi
   # Weiterleitung auf eine fremde Domain
   if grep -qiE '^\s*(RewriteRule|Redirect|RedirectMatch|RedirectPermanent)\b.*https?://' <<<"$L"; then
-    echo "externe-weiterleitung"; return
+    echo "external-redirect"; return
   fi
   # Options-Direktiven brauchen "AllowOverride Options" bzw. "All". Panels
   # setzen dort meist eine Whitelist ohne FollowSymLinks/ExecCGI/Includes.
@@ -96,17 +96,17 @@ classify_line() {
     if grep -qiE '^\s*Options\s+-Indexes\s*$' <<<"$L"; then
       echo "standard"; return
     fi
-    echo "options-risiko"; return
+    echo "options-risk"; return
   fi
   # 3. Uebliche, unkritische Kategorien
-  grep -qiE '^\s*(Redirect|RedirectMatch|RedirectPermanent|RedirectTemp)\b' <<<"$L" && { echo "weiterleitung"; return; }
+  grep -qiE '^\s*(Redirect|RedirectMatch|RedirectPermanent|RedirectTemp)\b' <<<"$L" && { echo "redirect"; return; }
   grep -qiE '^\s*(RewriteEngine|RewriteBase|RewriteCond|RewriteRule|RewriteOptions)' <<<"$L" && { echo "rewrite"; return; }
-  grep -qiE '^\s*(<Files|<FilesMatch|<Directory|<DirectoryMatch|<Limit|<LimitExcept|Require|Order|Allow|Deny|Auth|Satisfy)' <<<"$L" && { echo "zugriff"; return; }
+  grep -qiE '^\s*(<Files|<FilesMatch|<Directory|<DirectoryMatch|<Limit|<LimitExcept|Require|Order|Allow|Deny|Auth|Satisfy)' <<<"$L" && { echo "access"; return; }
   grep -qiE '^\s*(Header|RequestHeader|ExpiresByType|ExpiresActive|ExpiresDefault|AddOutputFilter|AddEncoding|AddCharset|BrowserMatch|Options|AddDefaultCharset|ErrorDocument|DirectoryIndex|FileETag|<IfModule|<If|</)' <<<"$L" && { echo "standard"; return; }
-  echo "unbekannt"
+  echo "unknown"
 }
 
-[[ $EUID -ne 0 ]] && { echo "Bitte als root ausfuehren."; exit 1; }
+[[ $EUID -ne 0 ]] && { echo "Run as root."; exit 1; }
 
 hr()   { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 ok()   { printf '\033[32m  [ok] %s\033[0m\n' "$*"; }
@@ -117,7 +117,7 @@ note() { printf '  %s\n' "$*"; }
 mkdir -p "$BACKUP_DIR"; chmod 700 "$BACKUP_DIR"
 
 # ---------------------------------------------------------------------------
-# Vorlagen
+# Templates
 # ---------------------------------------------------------------------------
 common_rules() {   # $1 = 1, wenn xmlrpc gesperrt werden soll
 cat <<'HEAD'
@@ -251,37 +251,37 @@ UPL
 }
 
 # ---------------------------------------------------------------------------
-# Wiederherstellung
+# Restore
 # ---------------------------------------------------------------------------
 if [[ $RESTORE -eq 1 ]]; then
-  hr "Sicherungen zurueckspielen"
+  hr "Restoring backups"
   FOUND=0
   while IFS= read -r META; do
     TARGET=$(head -1 "$META")
     DATA="${META%.meta}"
     [[ -f "$DATA" && -n "$TARGET" ]] || continue
-    cp -p "$DATA" "$TARGET" && ok "wiederhergestellt: $TARGET" && FOUND=1
+    cp -p "$DATA" "$TARGET" && ok "restored: $TARGET" && FOUND=1
   done < <(find "$BACKUP_DIR" -name '*.meta' -newermt '-30 days' | sort | tail -50)
-  [[ $FOUND -eq 0 ]] && warn "keine Sicherungen gefunden in ${BACKUP_DIR}"
+  [[ $FOUND -eq 0 ]] && warn "no backups found in ${BACKUP_DIR}"
   apachectl configtest 2>&1 | tail -1
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
-# Installationen finden
+# Find installations
 # ---------------------------------------------------------------------------
-hr "Installationen"
+hr "Installations"
 mapfile -t CONFIGS < <(
   ls -d /home/*/public_html/wordpress/wp-config.php \
         /home/*/public_html/wp-config.php 2>/dev/null | sort -u
 )
-[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "Keine WordPress-Installationen gefunden."; exit 0; }
+[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "No WordPress installations found."; exit 0; }
 
 # ---------------------------------------------------------------------------
-# Inventarmodus: erst wissen, was da ist - dann entscheiden
+# Inventory mode: know what is there before deciding
 # ---------------------------------------------------------------------------
 if [[ $INVENTORY -eq 1 ]]; then
-  hr "Inventar der vorhandenen .htaccess-Dateien"
+  hr "Inventory of existing .htaccess files"
   declare -A TOTAL=()
   for CONFIG in "${CONFIGS[@]}"; do
     WP_PATH=$(dirname "$CONFIG")
@@ -290,17 +290,17 @@ if [[ $INVENTORY -eq 1 ]]; then
     F="${WP_PATH}/.htaccess"
     printf '\n\033[1m%s\033[0m  (%s)\n' "$WP_PATH" "$SITE_USER"
     if [[ ! -f "$F" ]]; then
-      printf '  keine .htaccess vorhanden\n'
+      printf '  no .htaccess present\n'
       TOTAL[fehlt]=$(( ${TOTAL[fehlt]:-0} + 1 ))
       continue
     fi
-    printf '  %s Zeilen, geaendert %s\n' "$(wc -l < "$F")" "$(stat -c '%y' "$F" | cut -c1-16)"
+    printf '  %s lines, modified %s\n' "$(wc -l < "$F")" "$(stat -c '%y' "$F" | cut -c1-16)"
     RAW=$(awk '
       /# BEGIN WordPress/ { inwp=1 } /# END WordPress/ { inwp=0; next } inwp { next }
       /---- Absicherung/  { inown=1 } /---- Ende Absicherung/ { inown=0; next } inown { next }
       { print }' "$F" | sed -E '/^[[:space:]]*$/d')
     if [[ -z "$RAW" ]]; then
-      printf '  nur Standardbloecke, nichts Eigenes\n'
+      printf '  standard blocks only, nothing custom\n'
       TOTAL[standard]=$(( ${TOTAL[standard]:-0} + 1 ))
       continue
     fi
@@ -309,39 +309,39 @@ if [[ $INVENTORY -eq 1 ]]; then
       C=$(classify_line "$L")
       TOTAL[$C]=$(( ${TOTAL[$C]:-0} + 1 ))
       case "$C" in
-        kommentar) continue ;;
+        comment) continue ;;
         php-handler)          printf '\033[33m  [PHP-HANDLER] %s\033[0m\n' "$L" ;;
-        gefaehrlich)          printf '\033[31m  [GEFAEHRLICH] %s\033[0m\n' "$L" ;;
-        externe-weiterleitung) printf '  [ext. Weiterleitung] %s\n' "$L" ;;
-        unbekannt)            printf '\033[33m  [unbekannt]   %s\033[0m\n' "$L" ;;
+        dangerous)          printf '\033[31m  [DANGEROUS] %s\033[0m\n' "$L" ;;
+        external-redirect) printf '  [ext. redirect] %s\n' "$L" ;;
+        unknown)            printf '\033[33m  [unknown]     %s\033[0m\n' "$L" ;;
         *)                    printf '  [%s] %s\n' "$C" "$L" ;;
       esac
     done <<< "$RAW"
   done
 
-  hr "Summe ueber alle Seiten"
+  hr "Totals across all sites"
   for K in "${!TOTAL[@]}"; do printf '  %-22s %s\n' "$K" "${TOTAL[$K]}"; done
   cat <<'NEXT'
 
-  Zur Auswertung:
-    PHP-HANDLER  legt die PHP-Version fuer diese Seite fest (fcgid). Faellt die
-                 Zeile weg, laeuft die Seite mit der Server-Vorgabe - oder PHP
-                 wird gar nicht mehr ausgefuehrt. Wird immer uebernommen.
-                 Dauerhaft besser: PHP-Version im Panel bzw. vhost setzen,
-                 dann ist die .htaccess davon unabhaengig.
-    GEFAEHRLICH  wird nie uebernommen. Nach einem Vorfall die Zeile ansehen,
-                 bevor du sie irgendwo wiederverwendest.
-    unbekannt    von Hand ansehen - meist Plugin-Bloecke oder Handarbeit.
+  How to read this:
+    PHP-HANDLER  sets the PHP version for this site (fcgid). If the line
+                 disappears the site runs with the server default - or PHP
+                 stops running at all. Always carried over.
+                 Better long term: set the PHP version in the panel or vhost,
+                 then .htaccess no longer depends on it.
+    DANGEROUS    never carried over. After an incident, inspect the line
+                 before reusing it anywhere.
+    unknown      inspect manually - usually plugin blocks or handcrafted.
 
-  Danach:
-    wp-harden-htaccess              Trockenlauf mit klassifizierter Uebernahme
-    wp-harden-htaccess --strict     nur PHP-Handler uebernehmen, sonst nichts
+  Next:
+    wp-harden-htaccess              dry run with classified carry-over
+    wp-harden-htaccess --strict     carry over PHP handlers only
 NEXT
   exit 0
 fi
 
-[[ $APPLY -eq 1 ]] && warn "APPLY-MODUS - Dateien werden geschrieben" \
-                   || ok "TROCKENLAUF - es wird nichts geaendert"
+[[ $APPLY -eq 1 ]] && warn "APPLY MODE - files will be written" \
+                   || ok "DRY RUN - nothing is changed"
 
 STAMP=$(date +%F-%H%M%S)
 CHANGED=0; SKIPPED=0; FAILED=0
@@ -354,7 +354,7 @@ for CONFIG in "${CONFIGS[@]}"; do
 
   hr "${WP_PATH}  (${SITE_USER})"
 
-  # --- Layout bestimmen ----------------------------------------------------
+  # --- determine layout ----------------------------------------------------
   PARENT=$(dirname "$WP_PATH")
   if [[ "$(basename "$PARENT")" == "public_html" ]]; then
     LAYOUT="subdir"; SUB=$(basename "$WP_PATH")
@@ -365,9 +365,9 @@ for CONFIG in "${CONFIGS[@]}"; do
     TARGET="${WP_PATH}/.htaccess"
     RBASE="/"; RIDX="/index.php"
   fi
-  note "Layout: ${LAYOUT}   RewriteBase: ${RBASE}"
+  note "layout: ${LAYOUT}   RewriteBase: ${RBASE}"
 
-  # --- oeffentliche Adresse fuer den Vorher/Nachher-Test -------------------
+  # --- public URL for the before/after test -------------------
   WPBIN=""
   for CAND in "/home/${SITE_USER}/wp" "/home/${SITE_USER}/.wp-cli.phar" /usr/local/bin/wp; do
     sudo -u "$SITE_USER" -H test -r "$CAND" 2>/dev/null && { WPBIN="$CAND"; break; }
@@ -382,25 +382,25 @@ for CONFIG in "${CONFIGS[@]}"; do
     CORE_URL="${SITE_URL%/}${SUB:+/$SUB}"
     BEFORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${SITE_URL}/?nocache=$RANDOM")
     BEFORE_CORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${CORE_URL}/wp-includes/js/jquery/jquery.min.js?nocache=$RANDOM")
-    note "HTTP vorher: Startseite ${BEFORE}, Asset im Kern ${BEFORE_CORE}  (${SITE_URL})"
+    note "HTTP before: home ${BEFORE}, core asset ${BEFORE_CORE}  (${SITE_URL})"
   else
     BEFORE=""; BEFORE_CORE=""; CORE_URL=""
-    warn "oeffentliche Adresse nicht ermittelbar - kein Vorher/Nachher-Test moeglich"
+    warn "public URL not determinable - no before/after test possible"
   fi
 
   # --- AllowOverride -------------------------------------------------------
   if ! grep -rqs -- "$PARENT" /etc/apache2/sites-enabled /etc/httpd/conf.d 2>/dev/null; then
-    warn "kein vhost verweist auf ${PARENT} - AllowOverride bitte selbst pruefen"
+    warn "no vhost references ${PARENT} - please check AllowOverride yourself"
   else
     AO=$(grep -rhs -A5 -- "$PARENT" /etc/apache2/sites-enabled /etc/httpd/conf.d 2>/dev/null \
          | grep -m1 -i 'AllowOverride' | awk '{print $2}')
     case "${AO:-unset}" in
       All|all) ok "AllowOverride All" ;;
-      *) warn "AllowOverride ${AO:-nicht gefunden} - die Datei wird moeglicherweise ignoriert" ;;
+      *) warn "AllowOverride ${AO:-not found} - the file may be ignored" ;;
     esac
   fi
 
-  # --- eigene Regeln aus der bestehenden Datei klassifizieren --------------
+  # --- classify custom rules from the existing file --------------
   CUSTOM=""; DROPPED=""; KEPT_PHP=0
   if [[ -f "$TARGET" ]]; then
     RAW=$(awk '
@@ -419,15 +419,15 @@ for CONFIG in "${CONFIGS[@]}"; do
       C=$(classify_line "$L")
       CAT_COUNT[$C]=$(( ${CAT_COUNT[$C]:-0} + 1 ))
       case "$C" in
-        gefaehrlich)
-          DROPPED+="[gefaehrlich] $L"$'\n' ;;
-        options-risiko)
+        dangerous)
+          DROPPED+="[dangerous] $L"$'\n' ;;
+        options-risk)
           # Nie uebernehmen: braucht AllowOverride Options, sonst 500
-          DROPPED+="[Options braucht AllowOverride Options] $L"$'\n' ;;
+          DROPPED+="[Options needs AllowOverride Options] $L"$'\n' ;;
         php-handler)
           KEPT_PHP=1
           CUSTOM+="$L"$'\n' ;;
-        externe-weiterleitung|unbekannt)
+        external-redirect|unknown)
           if [[ $STRICT -eq 1 ]]; then
             DROPPED+="[--strict] $L"$'\n'
           else
@@ -443,31 +443,31 @@ for CONFIG in "${CONFIGS[@]}"; do
     done <<< "$RAW"
 
     if [[ -n "$RAW" ]]; then
-      note "vorhandene eigene Zeilen nach Kategorie:"
+      note "existing custom lines by category:"
       for K in "${!CAT_COUNT[@]}"; do printf '      %-22s %s\n' "$K" "${CAT_COUNT[$K]}"; done
     else
-      ok "keine eigenen Regeln vorhanden"
+      ok "no custom rules present"
     fi
-    [[ $KEPT_PHP -eq 1 ]] && ok "PHP-Handler gefunden - wird in jedem Fall uebernommen"
+    [[ $KEPT_PHP -eq 1 ]] && ok "PHP handler found - always carried over"
     if [[ -n "$DROPPED" ]]; then
-      warn "diese Zeilen werden NICHT uebernommen:"
+      warn "these lines will NOT be carried over:"
       echo "$DROPPED" | sed -E '/^\s*$/d' | head -10 | sed 's/^/      /'
     fi
     if [[ -n "$CUSTOM" ]]; then
       CLINES=$(grep -c . <<<"$CUSTOM")
-      note "uebernommen werden ${CLINES} Zeile(n):"
+      note "carrying over ${CLINES} line(s):"
       echo "$CUSTOM" | head -12 | sed 's/^/      /'
-      [[ "$CLINES" -gt 12 ]] && note "      ... und $((CLINES - 12)) weitere Zeilen"
+      [[ "$CLINES" -gt 12 ]] && note "      ... and $((CLINES - 12)) more lines"
     fi
   else
-    note ".htaccess existiert noch nicht"
+    note "no .htaccess yet"
   fi
 
-  # --- Inhalt zusammenbauen ------------------------------------------------
+  # --- assemble content ------------------------------------------------
   NEW=$(mktemp)
   {
     if [[ -n "$CUSTOM" ]]; then
-      echo "# ---- uebernommen aus der bisherigen .htaccess ----"
+      echo "# ---- carried over from the previous .htaccess ----"
       echo "$CUSTOM"
       echo
     fi
@@ -477,21 +477,21 @@ for CONFIG in "${CONFIGS[@]}"; do
   } > "$NEW"
 
   if [[ $APPLY -eq 0 ]]; then
-    note "wuerde schreiben: ${TARGET} ($(wc -l < "$NEW") Zeilen)"
-    note "wuerde schreiben: ${WP_PATH}/wp-content/uploads/.htaccess"
+    note "would write: ${TARGET} ($(wc -l < "$NEW") lines)"
+    note "would write: ${WP_PATH}/wp-content/uploads/.htaccess"
     rm -f "$NEW"
     continue
   fi
 
-  # --- sichern -------------------------------------------------------------
+  # --- back up -------------------------------------------------------------
   if [[ -f "$TARGET" ]]; then
     B="${BACKUP_DIR}/$(echo "$TARGET" | tr '/' '_')-${STAMP}"
     cp -p "$TARGET" "$B"
     echo "$TARGET" > "${B}.meta"
-    ok "gesichert: ${B}"
+    ok "backed up: ${B}"
   fi
 
-  # --- schreiben -----------------------------------------------------------
+  # --- write -----------------------------------------------------------
   install -m 644 -o "$SITE_USER" -g "$SITE_GROUP" "$NEW" "$TARGET"
   rm -f "$NEW"
 
@@ -502,14 +502,14 @@ for CONFIG in "${CONFIGS[@]}"; do
     uploads_rules > "${UPL_DIR}/.htaccess"
     chown "$SITE_USER:$SITE_GROUP" "${UPL_DIR}/.htaccess"
     chmod 644 "${UPL_DIR}/.htaccess"
-    ok "uploads/.htaccess geschrieben"
+    ok "uploads/.htaccess written"
   else
-    warn "uploads-Verzeichnis nicht gefunden"
+    warn "uploads directory not found"
   fi
 
-  # --- pruefen -------------------------------------------------------------
+  # --- verify -------------------------------------------------------------
   if ! apachectl configtest >/dev/null 2>&1; then
-    bad "apachectl configtest schlaegt fehl - Rueckrollung"
+    bad "apachectl configtest fails - rolling back"
     [[ -n "${B:-}" && -f "${B:-}" ]] && cp -p "$B" "$TARGET"
     FAILED=$((FAILED+1)); continue
   fi
@@ -518,29 +518,29 @@ for CONFIG in "${CONFIGS[@]}"; do
     sleep 1
     AFTER=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${SITE_URL}/?nocache=$RANDOM")
     AFTER_CORE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${CORE_URL}/wp-includes/js/jquery/jquery.min.js?nocache=$RANDOM")
-    note "HTTP nachher: Startseite ${AFTER}, Asset im Kern ${AFTER_CORE}"
+    note "HTTP after: home ${AFTER}, core asset ${AFTER_CORE}"
 
     DEGRADED=0
     [[ "$BEFORE"      =~ ^(200|301|302)$ && ! "$AFTER"      =~ ^(200|301|302)$ ]] && DEGRADED=1
     [[ "$BEFORE_CORE" =~ ^(200|301|302)$ && ! "$AFTER_CORE" =~ ^(200|301|302)$ ]] && DEGRADED=1
 
     if [[ $DEGRADED -eq 1 ]]; then
-      bad "Seite oder Assets antworten nach der Aenderung schlechter - Rueckrollung"
+      bad "site or assets respond worse after the change - rolling back"
       # Der Grund steht im Apache-Fehlerlog, typischerweise eine Options-Direktive,
       # die AllowOverride nicht zulaesst.
       ERRL=$(grep -h "$WP_PATH" /var/log/apache2/*error*.log /var/log/httpd/*error*.log 2>/dev/null | tail -2)
-      [[ -n "$ERRL" ]] && { note "  Apache meldet:"; echo "$ERRL" | sed 's/^/      /'; }
+      [[ -n "$ERRL" ]] && { note "  Apache reports:"; echo "$ERRL" | sed 's/^/      /'; }
       if [[ -n "${B:-}" && -f "${B:-}" ]]; then
-        cp -p "$B" "$TARGET"; ok "alte .htaccess wiederhergestellt"
+        cp -p "$B" "$TARGET"; ok "previous .htaccess restored"
       else
-        rm -f "$TARGET"; ok ".htaccess entfernt (es gab vorher keine)"
+        rm -f "$TARGET"; ok ".htaccess removed (there was none before)"
       fi
-      [[ -f "${UPL_DIR}/.htaccess" ]] && rm -f "${UPL_DIR}/.htaccess" && ok "uploads/.htaccess entfernt"
+      [[ -f "${UPL_DIR}/.htaccess" ]] && rm -f "${UPL_DIR}/.htaccess" && ok "uploads/.htaccess removed"
       FAILED=$((FAILED+1)); continue
     fi
   fi
 
-  # --- Wirksamkeitstest: laesst sich PHP in uploads noch ausfuehren? -------
+  # --- effectiveness test: can PHP in uploads still run? -------
   if [[ -n "$SITE_URL" && -d "$UPL_DIR" ]]; then
     PROBE="hardening-probe-$RANDOM.php"
     printf '<?php echo "PHP-AUSFUEHRUNG-MOEGLICH"; ' > "${UPL_DIR}/${PROBE}"
@@ -548,10 +548,10 @@ for CONFIG in "${CONFIGS[@]}"; do
     URLPATH="${SITE_URL}${SUB:+/$SUB}/wp-content/uploads/${PROBE}"
     RESP=$(curl -s --max-time 15 "$URLPATH")
     if echo "$RESP" | grep -q 'PHP-AUSFUEHRUNG-MOEGLICH'; then
-      bad "PHP in uploads wird WEITERHIN ausgefuehrt - AllowOverride pruefen!"
-      note "  getestet: ${URLPATH}"
+      bad "PHP in uploads is STILL executed - check AllowOverride!"
+      note "  tested: ${URLPATH}"
     else
-      ok "PHP in uploads wird nicht ausgefuehrt"
+      ok "PHP in uploads is not executed"
     fi
     rm -f "${UPL_DIR}/${PROBE}"
   fi
@@ -559,16 +559,16 @@ for CONFIG in "${CONFIGS[@]}"; do
   CHANGED=$((CHANGED+1))
 done
 
-hr "Ergebnis"
-printf '  geaendert: %d   uebersprungen: %d   zurueckgerollt: %d\n' "$CHANGED" "$SKIPPED" "$FAILED"
+hr "Result"
+printf '  changed: %d   skipped: %d   rolled back: %d\n' "$CHANGED" "$SKIPPED" "$FAILED"
 if [[ $APPLY -eq 1 ]]; then
-  printf '  Sicherungen: %s\n' "$BACKUP_DIR"
-  printf '  Zuruecknehmen: %s --restore\n' "$0"
+  printf '  backups: %s\n' "$BACKUP_DIR"
+  printf '  to undo: %s --restore\n' "$0"
   echo
-  echo "  Noch von Hand pruefen:"
-  echo "    - Permalinks in wp-admin einmal speichern (Einstellungen -> Permalinks)"
-  echo "    - Login, Medien-Upload und Block-Editor kurz testen"
-  echo "    - bei aktivem Caching-Plugin dessen Regeln neu schreiben lassen"
+  echo "  Still to do by hand:"
+  echo "    - save permalinks once in wp-admin (Settings -> Permalinks)"
+  echo "    - test login, media upload and the block editor"
+  echo "    - if a caching plugin is active, have it rewrite its rules"
 else
-  printf '  Mit --apply ausfuehren, um die Dateien zu schreiben.\n'
+  printf '  Re-run with --apply to write the files.\n'
 fi

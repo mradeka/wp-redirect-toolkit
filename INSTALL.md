@@ -1,7 +1,8 @@
 # Installation
 
 Schritt-für-Schritt-Anleitung für das wp-redirect-toolkit. Für die Bedienung
-der einzelnen Skripte siehe [README.md](README.md), für den Hintergrund
+der einzelnen Skripte siehe [README.md](README.md) (englisch) bzw.
+[README.de.md](README.de.md) (deutsch), für den Hintergrund
 [INCIDENT.md](INCIDENT.md).
 
 ---
@@ -225,8 +226,8 @@ git commit -m "Ausfuehrungsbit setzen"
 
 ```bash
 for S in wp-db-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
-         wp-cleanup-all wp-move-to-subdir wp-asset-scan \
-         check-usrlocalbin-access apply-blocklist; do
+         wp-cleanup-all wp-move-to-subdir wp-asset-scan wp-harden-htaccess \
+         wp-fix-ownership check-usrlocalbin-access apply-blocklist; do
   sudo install -m 755 "${S}.sh" "/usr/local/bin/${S}"
 done
 sudo install -m 700 wp-rotate-db-passwords.sh /usr/local/bin/wp-rotate-db-passwords
@@ -341,14 +342,15 @@ Shell-History mitschreibt — sonst steht es dauerhaft in `~/.bash_history`.
 
 ```bash
 for S in wp-db-audit wp-cron-list wp-user-audit wp-redirect-cleanup \
-         wp-cleanup-all wp-move-to-subdir wp-asset-scan \
-         check-usrlocalbin-access apply-blocklist wp-rotate-db-passwords; do
+         wp-cleanup-all wp-move-to-subdir wp-asset-scan wp-harden-htaccess \
+         wp-fix-ownership check-usrlocalbin-access apply-blocklist \
+         wp-rotate-db-passwords; do
   printf '%-28s ' "$S"
   command -v "$S" >/dev/null && stat -c '%A %n' "$(command -v "$S")" || echo "FEHLT"
 done
 ```
 
-Erwartet: neun Skripte mit `-rwxr-xr-x`, `wp-rotate-db-passwords` mit
+Erwartet: elf Skripte mit `-rwxr-xr-x`, `wp-rotate-db-passwords` mit
 `-rwx------`.
 
 Funktionstest ohne Nebenwirkungen:

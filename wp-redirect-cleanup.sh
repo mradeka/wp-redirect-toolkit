@@ -146,7 +146,7 @@ if [[ -n "$BAD_DOMAIN" && "$BAD_DOMAIN" != "__none__" ]]; then
       warn "home und siteurl enthalten beide '${BAD_DOMAIN}' - es wird mit den"
       warn "uebergebenen Werten gearbeitet (--url / --siteurl)."
     else
-      bad "Selbsterkennung nicht verwertbar: '${BAD_DOMAIN}' steckt in home UND siteurl"
+      bad "auto-detection unusable: '${BAD_DOMAIN}' appears in home AND siteurl"
       echo "    home:    ${H_CHK}"
       echo "    siteurl: ${S_CHK}"
       echo
@@ -253,14 +253,14 @@ fix_url_option() {           # $1 option name, $2 current value, $3 intended val
     *"$BAD_DOMAIN"*)
       bad "${opt} hijacked"
       if [[ -z "$want" ]]; then
-        warn "kein Sollwert bekannt - beide Optionen sind gekapert, es gibt"
-        warn "nichts zum Ableiten. Werte explizit angeben:"
-        echo  "        --url https://DEINE-DOMAIN.TLD \\"
-        echo  "        --siteurl https://DEINE-DOMAIN.TLD[/wordpress]"
-        echo  "    Die oeffentliche Adresse steht im vhost:"
+        warn "no intended value known - both options are hijacked, there is"
+        warn "nothing to derive from. Pass the values explicitly:"
+        echo  "        --url https://YOUR-DOMAIN.TLD \\"
+        echo  "        --siteurl https://YOUR-DOMAIN.TLD[/wordpress]"
+        echo  "    The public URL is in the vhost:"
         echo  "        grep -rh ServerName /etc/apache2/sites-enabled/ | sort -u"
-        echo  "    Bei Unterverzeichnis-Installationen endet --siteurl auf den"
-        echo  "    Verzeichnisnamen ($(basename "$WP_PATH")), --url nicht."
+        echo  "    For subdirectory installs --siteurl ends with the directory"
+        echo  "    name ($(basename "$WP_PATH")); --url does not."
       elif [[ $APPLY -eq 1 ]]; then
         $WP option update "$opt" "$want" >/dev/null && ok "${opt} -> ${want}"
       else

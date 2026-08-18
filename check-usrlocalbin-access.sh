@@ -38,14 +38,14 @@ PROBLEMS=0
 
 echo "== /usr/local/bin =="
 stat -c '  %A %U:%G  %n' /usr/local/bin
-[[ -e "$TARGET" ]] && stat -c '  %A %U:%G  %n' "$TARGET" || echo "  ${TARGET} existiert nicht"
+[[ -e "$TARGET" ]] && stat -c '  %A %U:%G  %n' "$TARGET" || echo "  ${TARGET} does not exist"
 PERM=$(stat -c '%A' /usr/local/bin)
 # character 10 of drwxr-xr-x is the "other" execute bit - a glob like *x*x*x*
 # matches the owner/group bits too and would pass on drwxrwx---
-[[ "${PERM:9:1}" == "x" ]] || echo "  ACHTUNG: /usr/local/bin ist nicht fuer alle durchsuchbar (${PERM})"
+[[ "${PERM:9:1}" == "x" ]] || echo "  WARNING: /usr/local/bin is not traversable for all (${PERM})"
 if [[ -e "$TARGET" ]]; then
   TPERM=$(stat -c '%A' "$TARGET")
-  [[ "${TPERM:9:1}" == "x" ]] || echo "  ACHTUNG: ${TARGET} ist nicht fuer alle ausfuehrbar (${TPERM})"
+  [[ "${TPERM:9:1}" == "x" ]] || echo "  WARNING: ${TARGET} is not executable for all (${TPERM})"
 fi
 echo
 
@@ -56,7 +56,7 @@ else
                        -exec stat -c '%U' {} + 2>/dev/null | sort -u)
 fi
 if [[ ${#USERS[@]} -eq 0 ]]; then
-  echo "Keine Benutzer mit WordPress-Installation gefunden (mit --all alle /home-Konten pruefen)."
+  echo "No users with a WordPress install found (use --all to check every /home account)."
 fi
 
 echo
@@ -70,21 +70,21 @@ ROOT_SCRIPTS=(wp-cleanup-all wp-db-audit wp-cron-list wp-user-audit wp-rotate-db
 for S in "${ROOT_SCRIPTS[@]}"; do
   P="/usr/local/bin/${S}"
   if [[ ! -e "$P" ]]; then
-    printf '  %-24s \033[33mnicht installiert\033[0m\n' "$S"
+    printf '  %-24s \033[33mnot installed\033[0m\n' "$S"
   elif [[ ! -x "$P" ]]; then
-    printf '  %-24s \033[31mnicht ausfuehrbar (%s)\033[0m\n' "$S" "$(stat -c '%A' "$P")"
+    printf '  %-24s \033[31mnot executable (%s)\033[0m\n' "$S" "$(stat -c '%A' "$P")"
     PROBLEMS=$((PROBLEMS+1))
   elif ! bash -n "$P" 2>/dev/null; then
-    printf '  %-24s \033[31mSyntaxfehler\033[0m\n' "$S"
+    printf '  %-24s \033[31msyntax error\033[0m\n' "$S"
     PROBLEMS=$((PROBLEMS+1))
   else
-    printf '  %-24s ok (nur root)\n' "$S"
+    printf '  %-24s ok (root only)\n' "$S"
   fi
 done
 for S in "${USER_SCRIPTS[@]}"; do
   P="/usr/local/bin/${S}"
-  [[ -e "$P" ]] && printf '  %-24s ok (als Seitenbenutzer aufrufbar - siehe Tabelle unten)\n' "$S" \
-                || printf '  %-24s \033[33mnicht installiert\033[0m\n' "$S"
+  [[ -e "$P" ]] && printf '  %-24s ok (callable as site user - see table below)\n' "$S" \
+                || printf '  %-24s \033[33mnot installed\033[0m\n' "$S"
 done
 
 echo
@@ -118,9 +118,9 @@ for U in "${USERS[@]}"; do
   # exits non-zero by design, so judge it by the output, not the exit code.
   CLEAN="/usr/local/bin/wp-redirect-cleanup"
   if [[ ! -e "$CLEAN" ]]; then
-    SCR="nicht installiert"
+    SCR="not installed"
   elif ! sudo -u "$U" -H test -x "$CLEAN" 2>/dev/null; then
-    SCR="NEIN (nicht ausfuehrbar)"
+    SCR="NO (not executable)"
   else
     HELP=$(sudo -u "$U" -H "$CLEAN" --help 2>&1 | head -40)
     if echo "$HELP" | grep -qi 'usage'; then
@@ -138,7 +138,7 @@ done
 
 echo
 if [[ $PROBLEMS -eq 0 ]]; then
-  echo "Alle geprueften Konten koennen ${TARGET} nutzen."
+  echo "All checked accounts can use ${TARGET}."
 else
   cat <<HINT
 ${PROBLEMS} Konto/Konten mit Einschraenkungen. Uebliche Ursachen und Abhilfe:

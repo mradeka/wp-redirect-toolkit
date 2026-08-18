@@ -2,32 +2,32 @@
 #
 # wp-fix-ownership.sh
 #
-# Prueft Eigentuemer und Rechte aller WordPress-Installationen unter
-# /home/<benutzer>/public_html[/wordpress] und bietet danach eine Auswahl an,
-# welche Seiten korrigiert werden sollen.
+# Checks ownership and permissions of every WordPress install under
+# /home/<user>/public_html[/wordpress], then lets you select which sites
+# to fix.
 #
-# Hintergrund: Laeuft ein "wp core download", ein Update oder ein Skript
-# versehentlich als root, gehoeren die Dateien danach root. Symptome:
+# Background: if a "wp core download", an update or a script accidentally
+# runs as root, the files end up owned by root. Symptoms:
 #
-#   - WordPress fragt bei Aktualisierungen nach FTP-Zugangsdaten
-#     (der PHP-Prozess ist nicht Eigentuemer -> get_filesystem_method()
-#      liefert 'ftpext' statt 'direct')
-#   - Medien-Uploads scheitern, wenn uploads/ betroffen ist
-#   - Themes koennen ihre generierten Stylesheets nicht schreiben
-#     (z. B. uploads/dynamic_avia/) - die Seite verliert ihre Formatierung
+#   - WordPress asks for FTP credentials when updating
+#     (the PHP process is not the owner -> get_filesystem_method()
+#      returns 'ftpext' instead of 'direct')
+#   - media uploads fail when uploads/ is affected
+#   - themes cannot write their generated stylesheets
+#     (e.g. uploads/dynamic_avia/) - the site loses its styling
 #
-# Uploads und Updates koennen dabei unabhaengig voneinander brechen: fuer
-# Uploads genuegt Schreibrecht in uploads/, fuer Updates muss der gesamte
-# Kern dem Seitenbenutzer gehoeren.
+# Uploads and updates break independently: uploads only need write access to
+# uploads/, while updates require the whole core to be owned by the site
+# user.
 #
-# Aendert nichts ohne Auswahl und Bestaetigung.
+# Changes nothing without selection and confirmation.
 #
 # Usage:
-#   ./wp-fix-ownership.sh              # pruefen, dann interaktiv auswaehlen
-#   ./wp-fix-ownership.sh --report     # nur pruefen, keine Auswahl
-#   ./wp-fix-ownership.sh --all --yes  # alle betroffenen ohne Rueckfrage
+#   ./wp-fix-ownership.sh              # check, then select interactively
+#   ./wp-fix-ownership.sh --report     # check only, no selection
+#   ./wp-fix-ownership.sh --all --yes  # all affected, no prompt
 #   ./wp-fix-ownership.sh --only siteuser
-#   ./wp-fix-ownership.sh --no-chmod   # nur Eigentuemer, Rechte unveraendert
+#   ./wp-fix-ownership.sh --no-chmod   # ownership only, leave permissions
 
 set -uo pipefail
 
@@ -45,11 +45,11 @@ while [[ $# -gt 0 ]]; do
     --only)     ONLY="$2"; shift 2 ;;
     --no-chmod) DO_CHMOD=0; shift ;;
     -h|--help)  sed -n '2,30p' "$0"; exit 0 ;;
-    *) echo "Unbekannte Option: $1"; exit 1 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
-[[ $EUID -ne 0 ]] && { echo "Bitte als root ausfuehren."; exit 1; }
+[[ $EUID -ne 0 ]] && { echo "Run as root."; exit 1; }
 
 hr()   { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 ok()   { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -57,20 +57,20 @@ warn() { printf '\033[33m%s\033[0m\n' "$*"; }
 bad()  { printf '\033[31m%s\033[0m\n' "$*"; }
 
 # ---------------------------------------------------------------------------
-# 1. Pruefen
+# 1. Check
 # ---------------------------------------------------------------------------
-hr "Pruefe Installationen"
+hr "Checking installations"
 
 mapfile -t CONFIGS < <(
   ls -d /home/*/public_html/wordpress/wp-config.php \
         /home/*/public_html/wp-config.php 2>/dev/null | sort -u
 )
-[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "Keine WordPress-Installationen gefunden."; exit 0; }
+[[ ${#CONFIGS[@]} -eq 0 ]] && { echo "No WordPress installations found."; exit 0; }
 
 declare -a PATHS=() USERS=() GROUPS=() COUNTS=() DETAILS=()
 IDX=0
 
-printf '\n  %-3s %-20s %8s  %-9s %s\n' "Nr" "Benutzer" "fremd" "Bereich" "Pfad"
+printf '\n  %-3s %-20s %8s  %-9s %s\n' "No" "user" "foreign" "area" "path"
 printf '  %s\n' "---------------------------------------------------------------------------------------"
 
 for CONFIG in "${CONFIGS[@]}"; do
@@ -81,25 +81,25 @@ for CONFIG in "${CONFIGS[@]}"; do
 
   N=$(find "$D" ! -user "$U" 2>/dev/null | wc -l)
 
-  # Wo genau sitzt das Problem? Das entscheidet, welches Symptom auftritt.
+  # Where exactly does it sit? That decides which symptom appears.
   N_CORE=$(find "$D" -maxdepth 1 ! -user "$U" 2>/dev/null | wc -l)
   N_ADMIN=$(find "$D/wp-admin" "$D/wp-includes" ! -user "$U" 2>/dev/null | wc -l)
   N_UP=$(find "$D/wp-content/uploads" ! -user "$U" 2>/dev/null | wc -l)
   N_CONT=$(find "$D/wp-content" -maxdepth 1 ! -user "$U" 2>/dev/null | wc -l)
 
   BEREICH=""
-  [[ "$N_ADMIN" -gt 0 || "$N_CORE" -gt 0 ]] && BEREICH="Kern"
+  [[ "$N_ADMIN" -gt 0 || "$N_CORE" -gt 0 ]] && BEREICH="core"
   [[ "$N_UP"    -gt 0 ]] && BEREICH="${BEREICH:+$BEREICH+}uploads"
   [[ "$N_CONT"  -gt 0 && -z "$BEREICH" ]] && BEREICH="content"
-  [[ -z "$BEREICH" && "$N" -gt 0 ]] && BEREICH="sonstige"
+  [[ -z "$BEREICH" && "$N" -gt 0 ]] && BEREICH="other"
   [[ "$N" -eq 0 ]] && BEREICH="-"
 
-  # fremde Eigentuemer namentlich, das sagt oft schon, wer es war
+  # foreign owners by name - often tells you who did it
   OWNERS=$(find "$D" ! -user "$U" -printf '%u\n' 2>/dev/null | sort -u | tr '\n' ' ')
 
   IDX=$((IDX+1))
   PATHS+=("$D"); USERS+=("$U"); GROUPS+=("$G"); COUNTS+=("$N")
-  DETAILS+=("Kern:${N_ADMIN} uploads:${N_UP} content:${N_CONT} Eigentuemer:${OWNERS:-–}")
+  DETAILS+=("core:${N_ADMIN} uploads:${N_UP} content:${N_CONT} owners:${OWNERS:-–}")
 
   if [[ "$N" -eq 0 ]]; then
     printf '  %-3s %-20s \033[32m%8s\033[0m  %-9s %s\n' "$IDX" "$U" "$N" "$BEREICH" "$D"
@@ -114,45 +114,45 @@ for i in "${!COUNTS[@]}"; do
   [[ "${COUNTS[$i]}" -gt 0 ]] && BETROFFEN+=("$i")
 done
 
-hr "Ergebnis"
+hr "Result"
 if [[ ${#BETROFFEN[@]} -eq 0 ]]; then
-  ok "  Alle ${IDX} Installationen gehoeren dem jeweiligen Seitenbenutzer."
-  echo "  Uploads und Aktualisierungen sollten ohne FTP-Abfrage funktionieren."
+  ok "  All ${IDX} installation(s) are owned by their site user."
+  echo "  Uploads and updates should work without the FTP prompt."
   exit 0
 fi
 
-bad "  ${#BETROFFEN[@]} von ${IDX} Installation(en) mit fremden Eigentuemern."
+bad "  ${#BETROFFEN[@]} of ${IDX} installation(s) have foreign owners."
 cat <<'ERKL'
 
-  Zur Einordnung:
-    Kern betroffen     -> Aktualisierungen fragen nach FTP-Zugangsdaten
-    uploads betroffen  -> Medien-Uploads scheitern
-    beides moeglich    -> unabhaengig voneinander, je nach Bereich
+  How to read this:
+    core affected      -> updates will ask for FTP credentials
+    uploads affected   -> media uploads fail
+    both possible      -> they break independently, depending on the area
 ERKL
 
-[[ $REPORT -eq 1 ]] && { echo; echo "  (--report: keine Aenderung)"; exit 1; }
+[[ $REPORT -eq 1 ]] && { echo; echo "  (--report: nothing changed)"; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 2. Auswahl
+# 2. Select
 # ---------------------------------------------------------------------------
 AUSWAHL=()
 if [[ $ALL -eq 1 ]]; then
   AUSWAHL=("${BETROFFEN[@]}")
-  warn "  --all: alle betroffenen Installationen ausgewaehlt"
+  warn "  --all: every affected installation selected"
 else
-  hr "Auswahl"
-  echo "  Zu korrigierende Nummern eingeben:"
-  echo "    einzeln    2 5 7"
-  echo "    Bereich    2-5"
-  echo "    alle       a"
-  echo "    abbrechen  q  (oder leer)"
+  hr "Selection"
+  echo "  Enter the numbers to fix:"
+  echo "    single     2 5 7"
+  echo "    range      2-5"
+  echo "    all        a"
+  echo "    abort      q  (or empty)"
   echo
-  printf '  betroffen: '
+  printf '  affected: '
   for i in "${BETROFFEN[@]}"; do printf '%s ' "$((i+1))"; done; echo
   echo
-  read -r -p "  Auswahl: " EINGABE
+  read -r -p "  Selection: " EINGABE
 
-  [[ -z "$EINGABE" || "${EINGABE,,}" == "q" ]] && { echo "  abgebrochen"; exit 0; }
+  [[ -z "$EINGABE" || "${EINGABE,,}" == "q" ]] && { echo "  aborted"; exit 0; }
 
   if [[ "${EINGABE,,}" == "a" ]]; then
     AUSWAHL=("${BETROFFEN[@]}")
@@ -166,53 +166,53 @@ else
         if [[ "$TOKEN" -ge 1 && "$TOKEN" -le "$IDX" ]]; then
           AUSWAHL+=("$((TOKEN-1))")
         else
-          warn "  ignoriert: ${TOKEN} (ausserhalb 1-${IDX})"
+          warn "  ignored: ${TOKEN} (outside 1-${IDX})"
         fi
       else
-        warn "  ignoriert: ${TOKEN}"
+        warn "  ignored: ${TOKEN}"
       fi
     done
   fi
 fi
 
-# Duplikate entfernen
+# remove duplicates
 mapfile -t AUSWAHL < <(printf '%s\n' "${AUSWAHL[@]:-}" | grep -E '^[0-9]+$' | sort -un)
-[[ ${#AUSWAHL[@]} -eq 0 ]] && { echo "  nichts ausgewaehlt"; exit 0; }
+[[ ${#AUSWAHL[@]} -eq 0 ]] && { echo "  nothing selected"; exit 0; }
 
 # ---------------------------------------------------------------------------
-# 3. Bestaetigen
+# 3. Confirm
 # ---------------------------------------------------------------------------
-hr "Wird korrigiert"
+hr "About to fix"
 for i in "${AUSWAHL[@]}"; do
-  printf '  %-20s %6s Datei(en)  %s\n' "${USERS[$i]}" "${COUNTS[$i]}" "${PATHS[$i]}"
+  printf '  %-20s %6s file(s)  %s\n' "${USERS[$i]}" "${COUNTS[$i]}" "${PATHS[$i]}"
 done
 echo
-echo "  chown -R <benutzer>:<gruppe> auf das Installationsverzeichnis"
+echo "  chown -R <user>:<group> on the installation directory"
 if [[ $DO_CHMOD -eq 1 ]]; then
-  echo "  chmod 755 fuer Verzeichnisse, 644 fuer Dateien, 640 fuer wp-config.php"
-  warn "  Achtung: eigene Skripte mit Ausfuehrungsbit verlieren es dabei."
-  warn "  Mit --no-chmod nur den Eigentuemer setzen."
+  echo "  chmod 755 for directories, 644 for files, 640 for wp-config.php"
+  warn "  Note: custom scripts lose their executable bit."
+  warn "  Use --no-chmod to set ownership only."
 else
-  echo "  Rechte bleiben unveraendert (--no-chmod)"
+  echo "  Permissions left unchanged (--no-chmod)"
 fi
 
 if [[ $ASSUME_YES -eq 0 ]]; then
   echo
-  read -r -p "  Ausfuehren? [y/N] " ANS
-  [[ "${ANS,,}" == "y" ]] || { echo "  abgebrochen"; exit 0; }
+  read -r -p "  Proceed? [y/N] " ANS
+  [[ "${ANS,,}" == "y" ]] || { echo "  aborted"; exit 0; }
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Korrigieren
+# 4. Fix
 # ---------------------------------------------------------------------------
-hr "Korrektur"
+hr "Fixing"
 FEHLER=0
 for i in "${AUSWAHL[@]}"; do
   D="${PATHS[$i]}"; U="${USERS[$i]}"; G="${GROUPS[$i]}"
   printf '  %s ... ' "$D"
 
-  # Ausfuehrbare Dateien vorher festhalten, damit sie sich nachvollziehen
-  # lassen, falls chmod etwas plattmacht
+  # Record executable files first so they can be traced if chmod
+  # flattens something
   EXECS=$(find "$D" -type f -perm -u+x 2>/dev/null | head -50)
   [[ -n "$EXECS" ]] && {
     LOG="/root/wp-fix-ownership-execs-$(basename "$(dirname "$D")")-$(date +%F-%H%M%S).txt"
@@ -220,7 +220,7 @@ for i in "${AUSWAHL[@]}"; do
   }
 
   if ! chown -R "$U:$G" "$D" 2>/dev/null; then
-    bad "chown fehlgeschlagen"; FEHLER=$((FEHLER+1)); continue
+    bad "chown failed"; FEHLER=$((FEHLER+1)); continue
   fi
 
   if [[ $DO_CHMOD -eq 1 ]]; then
@@ -232,18 +232,18 @@ for i in "${AUSWAHL[@]}"; do
   REST=$(find "$D" ! -user "$U" 2>/dev/null | wc -l)
   if [[ "$REST" -eq 0 ]]; then
     ok "ok"
-    [[ -n "${LOG:-}" ]] && printf '      vorher ausfuehrbare Dateien notiert in %s\n' "$LOG"
+    [[ -n "${LOG:-}" ]] && printf '      previously executable files noted in %s\n' "$LOG"
   else
-    bad "noch ${REST} fremde Datei(en) - von Hand pruefen"
+    bad "${REST} file(s) still foreign - check manually"
     FEHLER=$((FEHLER+1))
   fi
   unset LOG
 done
 
 # ---------------------------------------------------------------------------
-# 5. Nachkontrolle
+# 5. Verify
 # ---------------------------------------------------------------------------
-hr "Nachkontrolle"
+hr "Verification"
 for i in "${AUSWAHL[@]}"; do
   D="${PATHS[$i]}"; U="${USERS[$i]}"
   WPBIN=""
@@ -254,23 +254,22 @@ for i in "${AUSWAHL[@]}"; do
   M=$(sudo -u "$U" -H "$WPBIN" --path="$D" --skip-plugins --skip-themes eval \
         'require_once ABSPATH."wp-admin/includes/file.php"; echo get_filesystem_method();' 2>/dev/null)
   case "$M" in
-    direct) printf '  %-20s \033[32mdirect\033[0m - Aktualisierungen ohne FTP-Abfrage\n' "$U" ;;
-    "")     printf '  %-20s (nicht ermittelbar)\n' "$U" ;;
-    *)      printf '  %-20s \033[31m%s\033[0m - fragt weiter nach Zugangsdaten\n' "$U" "$M" ;;
+    direct) printf '  %-20s \033[32mdirect\033[0m - updates work without the FTP prompt\n' "$U" ;;
+    "")     printf '  %-20s (could not determine)\n' "$U" ;;
+    *)      printf '  %-20s \033[31m%s\033[0m - still prompts for credentials\n' "$U" "$M" ;;
   esac
 done
 
 cat <<'NEXT'
 
-  Noch pruefen:
-    - Aktualisierung im Backend anstossen (darf nicht nach FTP fragen)
-    - Medien-Upload testen
-    - bei Enfold/Divi: generierte Stylesheets neu erzeugen lassen
-      (Enfold -> Performance -> "Delete old CSS and JS files", dann speichern)
+  Still to check:
+    - trigger an update in wp-admin (must not ask for FTP credentials)
+    - test a media upload
+    - Enfold/Divi: regenerate the merged stylesheets
+      (Enfold -> Performance -> "Delete old CSS and JS files", then save)
 
-  Tauchen nach dem naechsten Update erneut fremde Eigentuemer auf, lief das
-  Update selbst als root - dann liegt die Ursache in einem Cron-Job oder einem
-  Panel-Vorgang, nicht in Handarbeit.
+  If foreign owners reappear after the next update, that update itself ran as
+  root - the cause is then a cron job or a panel task, not manual work.
 NEXT
 
 exit $FEHLER

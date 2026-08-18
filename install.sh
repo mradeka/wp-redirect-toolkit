@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ $EUID -ne 0 ]] && { echo "Bitte als root ausfuehren."; exit 1; }
+[[ $EUID -ne 0 ]] && { echo "Run as root."; exit 1; }
 
 # name:mode - the password rotator is 700, it writes cleartext credentials
 SCRIPTS=(
@@ -33,35 +33,36 @@ SCRIPTS=(
   "wp-asset-scan:755"
   "apply-blocklist:755"
   "wp-harden-htaccess:755"
+  "wp-fix-ownership:755"
   "wp-rotate-db-passwords:700"
 )
 
 if [[ $UNINSTALL -eq 1 ]]; then
   for E in "${SCRIPTS[@]}"; do
     N="${E%%:*}"
-    rm -f "${PREFIX}/${N}" && echo "  entfernt: ${PREFIX}/${N}"
+    rm -f "${PREFIX}/${N}" && echo "  removed: ${PREFIX}/${N}"
   done
-  echo "Fertig. /root/wp-db-credentials.txt und /root/wp-cleanup-logs bleiben erhalten."
+  echo "Done. /root/wp-db-credentials.txt and /root/wp-cleanup-logs are kept."
   exit 0
 fi
 
 # Vorgaengername aufraeumen: wp-cron-audit wurde zu wp-db-audit, sonst liegen
 # beide parallel und der alte laeuft weiter.
 if [[ -e "${PREFIX}/wp-cron-audit" ]]; then
-  rm -f "${PREFIX}/wp-cron-audit" && echo "  entfernt: ${PREFIX}/wp-cron-audit (heisst jetzt wp-db-audit)"
+  rm -f "${PREFIX}/wp-cron-audit" && echo "  removed: ${PREFIX}/wp-cron-audit (now named wp-db-audit)"
 fi
 
-echo "== Installation nach ${PREFIX} =="
+echo "== Installing to ${PREFIX} =="
 FAIL=0
-mkdir -p "$PREFIX" || { echo "Zielverzeichnis ${PREFIX} nicht anlegbar."; exit 1; }
+mkdir -p "$PREFIX" || { echo "Cannot create target directory ${PREFIX}."; exit 1; }
 for E in "${SCRIPTS[@]}"; do
   N="${E%%:*}"; M="${E##*:}"
   F="${SRC}/${N}.sh"
   if [[ ! -f "$F" ]]; then
-    printf '  \033[31mfehlt: %s\033[0m\n' "${N}.sh"; FAIL=1; continue
+    printf '  \033[31mmissing: %s\033[0m\n' "${N}.sh"; FAIL=1; continue
   fi
   if ! bash -n "$F" 2>/dev/null; then
-    printf '  \033[31mSyntaxfehler: %s - nicht installiert\033[0m\n' "${N}.sh"; FAIL=1; continue
+    printf '  \033[31msyntax error: %s - not installed\033[0m\n' "${N}.sh"; FAIL=1; continue
   fi
   install -m "$M" "$F" "${PREFIX}/${N}" \
     && printf '  \033[32mok\033[0m  %-26s (Modus %s)\n' "${PREFIX}/${N}" "$M"
@@ -75,16 +76,16 @@ if [[ -f "${SRC}/blocklist-domains.txt" ]]; then
   echo "        apply-blocklist findet sie ueber: LIST=/usr/local/share/wp-redirect-toolkit/blocklist-domains.txt"
 fi
 
-echo "== Voraussetzungen =="
+echo "== Prerequisites =="
 check() { command -v "$1" >/dev/null 2>&1 && printf '  \033[32mok\033[0m  %-10s %s\n' "$1" "$(command -v "$1")" \
-                                          || { printf '  \033[31mfehlt\033[0m %s\n' "$1"; FAIL=1; }; }
+                                          || { printf '  \033[31mmissing\033[0m %s\n' "$1"; FAIL=1; }; }
 check bash; check php; check mysql; check curl; check sudo
 
 if command -v wp >/dev/null 2>&1; then
   V=$(wp --version --allow-root 2>/dev/null | awk '{print $2}')
   case "$V" in
     2.[0-6].*|1.*) printf '  \033[33mwarn\033[0m WP-CLI %s ist zu alt - 2.7+ empfohlen\033[0m\n' "$V" ;;
-    "")            printf '  \033[33mwarn\033[0m WP-CLI-Version nicht ermittelbar\n' ;;
+    "")            printf '  \033[33mwarn\033[0m WP-CLI version not determinable\n' ;;
     *)             printf '  \033[32mok\033[0m  WP-CLI    %s\n' "$V" ;;
   esac
 else
@@ -95,7 +96,7 @@ else
 fi
 
 BV="${BASH_VERSINFO[0]}"
-[[ "$BV" -lt 4 ]] && { printf '  \033[31mfehlt\033[0m Bash 4+ (gefunden: %s)\n' "$BV"; FAIL=1; }
+[[ "$BV" -lt 4 ]] && { printf '  \033[31mmissing\033[0m Bash 4+ (found: %s)\n' "$BV"; FAIL=1; }
 
 echo
 if [[ $FAIL -eq 0 ]]; then
@@ -109,5 +110,5 @@ Installation vollstaendig. Empfohlener Einstieg:
 Alles Weitere in README.md, der Vorfallshergang in INCIDENT.md.
 NEXT
 else
-  echo "Installation mit Einschraenkungen - siehe Meldungen oben."
+  echo "Installed with limitations - see messages above."
 fi

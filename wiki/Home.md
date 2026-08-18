@@ -4,6 +4,8 @@ Werkzeuge zur Analyse und Bereinigung einer WordPress-Kompromittierung, bei der
 eine Weiterleitung **direkt in die Datenbank** geschrieben wurde — ohne
 Veränderung einer einzigen PHP-Datei.
 
+Dieses Wiki ist deutsch; die Skriptausgaben sind englisch.
+
 Entstanden während eines realen Vorfalls auf einem Host mit zehn
 WordPress-Installationen. Jedes Erkennungsmuster ist gegen echte Befunde
 **und** gegen legitime Gegenbeispiele geprüft.

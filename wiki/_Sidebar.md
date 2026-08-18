@@ -16,6 +16,7 @@
 - [Absicherung](Absicherung)
 
 **Repository**
-- [README](https://github.com/mradeka/wp-redirect-toolkit#readme)
+- [README (en)](https://github.com/mradeka/wp-redirect-toolkit#readme)
+- [README (de)](https://github.com/mradeka/wp-redirect-toolkit/blob/main/README.de.md)
 - [INSTALL.md](https://github.com/mradeka/wp-redirect-toolkit/blob/main/INSTALL.md)
 - [Issues](https://github.com/mradeka/wp-redirect-toolkit/issues)
