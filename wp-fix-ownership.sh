@@ -67,7 +67,7 @@ mapfile -t CONFIGS < <(
 )
 [[ ${#CONFIGS[@]} -eq 0 ]] && { echo "No WordPress installations found."; exit 0; }
 
-declare -a PATHS=() USERS=() GROUPS=() COUNTS=() DETAILS=()
+declare -a PATHS=() USERS=() SITE_GROUPS=() COUNTS=() DETAILS=()
 IDX=0
 
 printf '\n  %-3s %-20s %8s  %-9s %s\n' "No" "user" "foreign" "area" "path"
@@ -89,8 +89,13 @@ for CONFIG in "${CONFIGS[@]}"; do
 
   # Point it out when wp-config.php itself has the wrong owner - that is what
   # made the old detection fail.
+  # Note: use if/fi, not "[[ ... ]] && warn". A false test returns exit code 1,
+  # and as the last statement before the loop continues that can abort the
+  # whole loop - which silently reduced the report to a single site.
   CONF_OWNER=$(stat -c '%U' "$CONFIG")
-  [[ "$CONF_OWNER" != "$U" ]] && warn "wp-config.php is owned by ${CONF_OWNER}, expected ${U}"
+  if [[ "$CONF_OWNER" != "$U" ]]; then
+    warn "wp-config.php is owned by ${CONF_OWNER}, expected ${U}"
+  fi
   [[ -n "$ONLY" && "$U" != "$ONLY" ]] && continue
 
   N=$(find "$D" ! -user "$U" 2>/dev/null | wc -l)
@@ -112,7 +117,7 @@ for CONFIG in "${CONFIGS[@]}"; do
   OWNERS=$(find "$D" ! -user "$U" -printf '%u\n' 2>/dev/null | sort -u | tr '\n' ' ')
 
   IDX=$((IDX+1))
-  PATHS+=("$D"); USERS+=("$U"); GROUPS+=("$G"); COUNTS+=("$N")
+  PATHS+=("$D"); USERS+=("$U"); SITE_GROUPS+=("$G"); COUNTS+=("$N")
   DETAILS+=("core:${N_ADMIN} uploads:${N_UP} content:${N_CONT} owners:${OWNERS:-–}")
 
   if [[ "$N" -eq 0 ]]; then
@@ -222,7 +227,7 @@ fi
 hr "Fixing"
 FEHLER=0
 for i in "${AUSWAHL[@]}"; do
-  D="${PATHS[$i]}"; U="${USERS[$i]}"; G="${GROUPS[$i]}"
+  D="${PATHS[$i]}"; U="${USERS[$i]}"; G="${SITE_GROUPS[$i]}"
   printf '  %s ... ' "$D"
 
   # Record executable files first so they can be traced if chmod

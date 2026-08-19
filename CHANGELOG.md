@@ -31,6 +31,10 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Fixed
 
+- **`wp-fix-ownership` reported only the first installation.** The script used
+  an array named `GROUPS`, which is a reserved bash variable holding the
+  process's group IDs. The assignment fails and silently terminates the loop —
+  with exit code 0, so it looked like a normal run. Renamed to `SITE_GROUPS`.
 - **Site user is derived from the path, not from `wp-config.php`.** Deriving
   it from that file is circular: if `wp-config.php` is owned by root, the
   derived user becomes root and `find ! -user root` reports zero foreign
