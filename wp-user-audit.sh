@@ -129,35 +129,35 @@ for CONFIG in "${CONFIGS[@]}"; do
 
     SCORE=0; WHY=""
     if [[ "$ROLES" == *administrator* && "$LOGIN" != "$SITE_USER" ]]; then
-      SCORE=$((SCORE+3)); WHY="${WHY}admin≠unixuser "
+      SCORE=$((SCORE+3)); WHY="${WHY}admin!=unixuser "
     fi
     if [[ -n "$REGDATE" && "$REGDATE" > "$SINCE" ]]; then
-      SCORE=$((SCORE+2)); WHY="${WHY}neu-registriert "
+      SCORE=$((SCORE+2)); WHY="${WHY}newly-registered "
     fi
     EMDOM="${EMAIL##*@}"
     if [[ -n "$SITE_DOMAIN" && -n "$EMDOM" && "$EMDOM" != *"$SITE_DOMAIN"* ]]; then
-      SCORE=$((SCORE+2)); WHY="${WHY}fremde-maildomain "
+      SCORE=$((SCORE+2)); WHY="${WHY}foreign-mail-domain "
     fi
     if [[ "$POSTS" -eq 0 ]]; then
-      SCORE=$((SCORE+1)); WHY="${WHY}keine-beitraege "
+      SCORE=$((SCORE+1)); WHY="${WHY}no-posts "
     fi
     if [[ "$LOGIN" =~ $RANDOM_RE && ${#LOGIN} -ge 8 ]]; then
-      SCORE=$((SCORE+1)); WHY="${WHY}zufallsname "
+      SCORE=$((SCORE+1)); WHY="${WHY}random-name "
     fi
     if [[ -n "$REGDATE" && "$REGDATE" < "$SINCE" && "$POSTS" -gt 0 ]]; then
-      SCORE=$((SCORE-3)); WHY="${WHY}alt+aktiv "
+      SCORE=$((SCORE-3)); WHY="${WHY}old+active "
     fi
     # A subscriber or shop customer cannot change the site. Registered before
     # the incident, such an account is almost always a real person, and the
     # "foreign mail domain / no posts" signals describe every one of them.
     if [[ "$ROLES" == *subscriber* || "$ROLES" == *customer* ]]; then
       if [[ -z "$REGDATE" || "$REGDATE" < "$SINCE" ]]; then
-        SCORE=$((SCORE-3)); WHY="${WHY}nur-abonnent "
+        SCORE=$((SCORE-3)); WHY="${WHY}subscriber-only "
       fi
     fi
 
     if [[ $SCORE -ge 4 ]]; then
-      printf '\033[31m  %-5s %-22s %-30s %-15s %-12s %-6s  <== VERDACHT (%d: %s)\033[0m\n' \
+      printf '\033[31m  %-5s %-22s %-30s %-15s %-12s %-6s  <== SUSPECT (%d: %s)\033[0m\n' \
              "$ID" "$LOGIN" "$EMAIL" "$ROLES" "$REGDATE" "$POSTS" "$SCORE" "$WHY"
       SUSPECT_IDS+=("$ID"); SUSPECT_LOGINS+=("$LOGIN")
       FOUND=1
@@ -167,11 +167,11 @@ for CONFIG in "${CONFIGS[@]}"; do
   done <<< "$USERS"
 
   if [[ ${#SUSPECT_IDS[@]} -eq 0 ]]; then
-    printf '\033[32m\n  => keine verdaechtigen Konten\033[0m\n'
+    printf '\033[32m\n  => no suspicious accounts\033[0m\n'
     continue
   fi
 
-  printf '\033[31m\n  => %d verdaechtige(s) Konto/Konten\033[0m\n' "${#SUSPECT_IDS[@]}"
+  printf '\033[31m\n  => %d suspicious account(s)\033[0m\n' "${#SUSPECT_IDS[@]}"
 
   [[ $DELETE -eq 0 ]] && { printf '  (Report only. Use --delete to remove, with a prompt per account.)\n'; continue; }
 
@@ -234,12 +234,12 @@ if [[ $SHUFFLE -eq 1 ]]; then
   fi
 fi
 
-printf '\n\033[1m===== HINWEIS =====\033[0m\n'
+printf '\n\033[1m===== NOTE =====\033[0m\n'
 cat <<'NOTE'
-Konten zu loeschen behebt das Symptom, nicht die Ursache. Wer die Konten per
-SQL anlegen konnte, legt sie erneut an. Vor dem Loeschen:
-  - Zugang schliessen (Webmin nicht oeffentlich, Passwoerter wechseln)
-  - wp config shuffle-salts  -> wirft alle bestehenden Sitzungen raus
-  - danach erneut pruefen: tauchen die Konten wieder auf, besteht der Zugang
+Deleting accounts fixes the symptom, not the cause. Whoever could create them
+via SQL will create them again. Before deleting:
+  - close the way in (panel not public, rotate passwords)
+  - wp config shuffle-salts  -> invalidates all existing sessions
+  - then check again: if the accounts reappear, access still exists
 NOTE
 exit $FOUND

@@ -152,19 +152,19 @@ ${PROBLEMS} Konto/Konten mit Einschraenkungen. Uebliche Ursachen und Abhilfe:
       Abhilfe: Kopie ins Home des Benutzers legen und per --wp-bin nutzen:
         install -m 755 -o USER -g USER ${TARGET} /home/USER/${BIN}
 
-  jail = JA
-      Der Account ist chrootet. 'sudo -u' laeuft ausserhalb des Kaefigs und
-      funktioniert, ein SSH-Login des Benutzers sieht /usr/local/bin aber
-      nicht. Dann gehoert das Werkzeug in den Jail oder ins Home.
+  jail = YES
+      The account is chrooted. 'sudo -u' runs outside the jail and works, but
+      an SSH login by that user does not see /usr/local/bin. The tool then
+      belongs inside the jail or in the home directory.
 
-  PATH = NEIN
-      /usr/local/bin fehlt in der Login-PATH des Kontos. Entweder immer den
-      vollen Pfad angeben, oder in /etc/profile.d/ ergaenzen.
+  PATH = NO
+      /usr/local/bin is missing from the account's login PATH. Either always
+      use the full path, or add it in /etc/profile.d/.
 
-  cleanup-skript = NEIN
-      Das Skript liegt an einer Stelle, die der Benutzer nicht betreten darf
-      (etwa /root, Modus 700). Richtig ist:
+  cleanup script = NO
+      The script sits somewhere the user may not enter (e.g. /root, mode 700).
+      The correct way is:
         install -m 755 /root/wp-redirect-cleanup.sh /usr/local/bin/wp-redirect-cleanup
-      Bei "nicht ausfuehrbar": chmod 755 /usr/local/bin/wp-redirect-cleanup
+      If "not executable": chmod 755 /usr/local/bin/wp-redirect-cleanup
 HINT
 fi

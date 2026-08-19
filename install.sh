@@ -46,8 +46,8 @@ if [[ $UNINSTALL -eq 1 ]]; then
   exit 0
 fi
 
-# Vorgaengername aufraeumen: wp-cron-audit wurde zu wp-db-audit, sonst liegen
-# beide parallel und der alte laeuft weiter.
+# Clean up the old name: wp-cron-audit became wp-db-audit; otherwise both
+# sit side by side and the old one keeps running.
 if [[ -e "${PREFIX}/wp-cron-audit" ]]; then
   rm -f "${PREFIX}/wp-cron-audit" && echo "  removed: ${PREFIX}/wp-cron-audit (now named wp-db-audit)"
 fi
@@ -73,7 +73,7 @@ if [[ -f "${SRC}/blocklist-domains.txt" ]]; then
   install -d -m 755 /usr/local/share/wp-redirect-toolkit
   install -m 644 "${SRC}/blocklist-domains.txt" /usr/local/share/wp-redirect-toolkit/
   printf '  \033[32mok\033[0m  %-26s\n' "/usr/local/share/wp-redirect-toolkit/blocklist-domains.txt"
-  echo "        apply-blocklist findet sie ueber: LIST=/usr/local/share/wp-redirect-toolkit/blocklist-domains.txt"
+  echo "        apply-blocklist finds it via: LIST=/usr/local/share/wp-redirect-toolkit/blocklist-domains.txt"
 fi
 
 echo "== Prerequisites =="
@@ -84,12 +84,12 @@ check bash; check php; check mysql; check curl; check sudo
 if command -v wp >/dev/null 2>&1; then
   V=$(wp --version --allow-root 2>/dev/null | awk '{print $2}')
   case "$V" in
-    2.[0-6].*|1.*) printf '  \033[33mwarn\033[0m WP-CLI %s ist zu alt - 2.7+ empfohlen\033[0m\n' "$V" ;;
+    2.[0-6].*|1.*) printf '  \033[33mwarn\033[0m WP-CLI %s is too old - 2.7+ recommended\033[0m\n' "$V" ;;
     "")            printf '  \033[33mwarn\033[0m WP-CLI version not determinable\n' ;;
     *)             printf '  \033[32mok\033[0m  WP-CLI    %s\n' "$V" ;;
   esac
 else
-  printf '  \033[31mfehlt\033[0m WP-CLI\n'
+  printf '  \033[31mmissing\033[0m WP-CLI\n'
   echo "        curl -fL -o /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
   echo "        install -m 755 /tmp/wp-cli.phar /usr/local/bin/wp"
   FAIL=1
@@ -101,13 +101,13 @@ BV="${BASH_VERSINFO[0]}"
 echo
 if [[ $FAIL -eq 0 ]]; then
   cat <<'NEXT'
-Installation vollstaendig. Empfohlener Einstieg:
+Installation complete. Suggested starting point:
 
-  check-usrlocalbin-access     # koennen alle Konten die Werkzeuge nutzen?
-  wp-db-audit                # Bestandsaufnahme, aendert nichts
-  wp-cleanup-all               # Trockenlauf ueber alle Seiten
+  check-usrlocalbin-access     # can every account use the tools?
+  wp-db-audit                  # inventory, changes nothing
+  wp-cleanup-all               # dry run across all sites
 
-Alles Weitere in README.md, der Vorfallshergang in INCIDENT.md.
+Everything else is in README.md; the incident report is in INCIDENT.md.
 NEXT
 else
   echo "Installed with limitations - see messages above."

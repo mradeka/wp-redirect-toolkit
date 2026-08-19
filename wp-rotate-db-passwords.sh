@@ -126,15 +126,15 @@ for U in "${!USER_PATHS[@]}"; do
 done
 
 if [[ $APPLY -eq 0 ]]; then
-  hr "Trockenlauf"
-  echo "  Es wuerde je Datenbankbenutzer ein neues Passwort (${LENGTH} Zeichen) gesetzt,"
-  echo "  in alle zugehoerigen wp-config.php geschrieben und in ${CREDFILE} protokolliert."
-  echo "  Mit --apply ausfuehren."
+  hr "Dry run"
+  echo "  A new password (${LENGTH} chars) would be set per database user,"
+  echo "  written into every matching wp-config.php and recorded in ${CREDFILE}."
+  echo "  Re-run with --apply."
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
-hr "Anmeldedaten-Datei vorbereiten"
+hr "Preparing the credentials file"
 touch "$CREDFILE"; chmod 600 "$CREDFILE"; chown root:root "$CREDFILE"
 ok "${CREDFILE} (Modus 600)"
 {
@@ -148,7 +148,7 @@ for DBUSER in "${!USER_PATHS[@]}"; do
   DBNAME="${USER_DB[$DBUSER]}"
   mapfile -t PATHS < <(echo -n "${USER_PATHS[$DBUSER]}" | grep .)
 
-  hr "DB-Benutzer ${DBUSER} (${#PATHS[@]} Installation(en))"
+  hr "DB user ${DBUSER} (${#PATHS[@]} installation(s))"
 
   # old password, needed for rollback
   FIRST="${PATHS[0]}/wp-config.php"
@@ -159,7 +159,7 @@ for DBUSER in "${!USER_PATHS[@]}"; do
   # which host part the grant uses - usually localhost, sometimes %
   HOSTS=$(mysql $MYSQL_OPTS -N -B -e \
     "SELECT Host FROM mysql.user WHERE User='${DBUSER}';" 2>/dev/null)
-  [[ -z "$HOSTS" ]] && { err "MySQL kennt den Benutzer '${DBUSER}' nicht"; FAILC=$((FAILC+1)); continue; }
+  [[ -z "$HOSTS" ]] && { err "MySQL does not know user '${DBUSER}'"; FAILC=$((FAILC+1)); continue; }
 
   # --- record BEFORE changing anything, so a crash never loses the password
   {
@@ -179,11 +179,11 @@ for DBUSER in "${!USER_PATHS[@]}"; do
     [[ -z "$H" ]] && continue
     mysql $MYSQL_OPTS -e "ALTER USER '${DBUSER}'@'${H}' IDENTIFIED BY '${NEWPW}';" 2>/dev/null \
       || mysql $MYSQL_OPTS -e "SET PASSWORD FOR '${DBUSER}'@'${H}' = PASSWORD('${NEWPW}');" 2>/dev/null \
-      || { err "ALTER USER fuer ${DBUSER}@${H} fehlgeschlagen"; SQL_FAIL=1; }
+      || { err "ALTER USER failed for ${DBUSER}@${H}"; SQL_FAIL=1; }
   done <<< "$HOSTS"
   mysql $MYSQL_OPTS -e "FLUSH PRIVILEGES;" >/dev/null 2>&1
   [[ $SQL_FAIL -eq 1 ]] && { FAILC=$((FAILC+1)); continue; }
-  ok "MySQL-Passwort gesetzt"
+  ok "MySQL password set"
 
   # --- 2. wp-config.php in every install using this user
   CFG_FAIL=0; declare -a BACKUPS=()
@@ -197,11 +197,11 @@ for DBUSER in "${!USER_PATHS[@]}"; do
       # would treat as regex metacharacters and then fail on a correct write
       WROTE=$(grep -oP "define\(\s*'DB_PASSWORD'\s*,\s*'\K[^']*" "$C" | head -1)
       if [[ "$WROTE" != "$NEWPW" ]]; then
-        err "Eintrag in ${C} nicht bestaetigt (gelesen: ${#WROTE} Zeichen, erwartet: ${#NEWPW})"
+        err "entry in ${C} not confirmed (read: ${#WROTE} chars, expected: ${#NEWPW})"
         CFG_FAIL=1
       fi
     else
-      err "sed fehlgeschlagen fuer ${C}"; CFG_FAIL=1
+      err "sed failed for ${C}"; CFG_FAIL=1
     fi
   done
 
@@ -225,10 +225,10 @@ for DBUSER in "${!USER_PATHS[@]}"; do
 
   # --- 4. rollback if anything went wrong
   if [[ $CFG_FAIL -eq 1 ]]; then
-    err "Rollback fuer ${DBUSER}"
+    err "rolling back ${DBUSER}"
     for BP in "${BACKUPS[@]}"; do
       C="${BP%%|*}"; B="${BP##*|}"
-      cp -p "$B" "$C" && printf '    wiederhergestellt: %s\n' "$C"
+      cp -p "$B" "$C" && printf '    restored: %s\n' "$C"
     done
     if [[ -n "$OLDPW" ]]; then
       while read -r H; do
@@ -236,7 +236,7 @@ for DBUSER in "${!USER_PATHS[@]}"; do
         mysql $MYSQL_OPTS -e "ALTER USER '${DBUSER}'@'${H}' IDENTIFIED BY '${OLDPW}';" 2>/dev/null
       done <<< "$HOSTS"
       mysql $MYSQL_OPTS -e "FLUSH PRIVILEGES;" >/dev/null 2>&1
-      printf '    altes MySQL-Passwort wiederhergestellt\n'
+      printf '    previous MySQL password restored\n'
     fi
     echo "ROLLBACK: ${DBUSER} - password NOT changed" >> "$CREDFILE"
     FAILC=$((FAILC+1))
@@ -249,17 +249,16 @@ for DBUSER in "${!USER_PATHS[@]}"; do
 done
 
 hr "Ergebnis"
-printf '  %d Datenbankbenutzer rotiert, %d fehlgeschlagen\n' "$OKC" "$FAILC"
-printf '  Passwoerter: %s\n' "$CREDFILE"
+printf '  %d database user(s) rotated, %d failed\n' "$OKC" "$FAILC"
+printf '  passwords: %s\n' "$CREDFILE"
 cat <<'NEXT'
 
-  Noch von Hand pruefen:
-    - Seiten im Browser aufrufen (ein Verbindungsfehler zeigt sich sofort)
-    - andere Dienste mit denselben Zugangsdaten: Backup-Skripte, phpMyAdmin,
-      Cron-Jobs, ~/.my.cnf der Seitenbenutzer
-    - danach: wp-user-audit --shuffle-salts   (wirft alle Sitzungen raus)
+  Still to check by hand:
+    - open the sites in a browser (a connection error shows up immediately)
+    - other services using the same credentials: backup scripts, phpMyAdmin,
+      cron jobs, the site users' ~/.my.cnf
+    - afterwards: wp-user-audit --shuffle-salts   (invalidates all sessions)
 
-  Die Datei enthaelt Klartext-Passwoerter. Sie gehoert nach /root, niemals in
-  ein Home- oder Webverzeichnis, und nicht in ein Backup, das weitergegeben
-  wird.
+  The file contains cleartext passwords. It belongs under /root, never in a
+  home or web directory, and not in a backup that gets handed on.
 NEXT

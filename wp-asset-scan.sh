@@ -155,7 +155,7 @@ for ROOT in "${ROOTS[@]}"; do
       HTML_HIT=$((HTML_HIT+1)); TOTAL_HIT=$((TOTAL_HIT+1))
     fi
   done < <(find "$ROOT" -type f \( -name '*.htm' -o -name '*.html' \) -print0 2>/dev/null)
-  [[ $HTML_HIT -eq 0 ]] && ok "keine auffaelligen HTML files"
+  [[ $HTML_HIT -eq 0 ]] && ok "no suspicious HTML files"
 
   # Campaign filenames. Important: the default theme ships a pattern called
   # "page-coming-soon.php" plus a background image - so theme and plugin
@@ -288,7 +288,9 @@ for ROOT in "${ROOTS[@]}"; do
   RECENT=$(find "$ROOT" -name '*.php' -mtime -7 -type f 2>/dev/null | head -10)
   if [[ -n "$RECENT" ]]; then
     printf '    PHP files changed in the last 7 days (compare against your own work):\n'
-    echo "$RECENT" | while read -r f; do printf '      %s\n' "$(stat -c '%y %n' "$f" | cut -c1-16,21-)"; done
+    echo "$RECENT" | while read -r f; do
+      printf '      %s  %s\n' "$(stat -c '%y' "$f" | cut -c1-16)" "$f"
+    done
   fi
   [[ $MISC -eq 0 ]] && ok "no further file findings"
 
@@ -310,9 +312,34 @@ for ROOT in "${ROOTS[@]}"; do
       WP="sudo -u ${OWNER} -H ${WPBIN} --path=${WPDIR} --skip-plugins --skip-themes"
 
       CK=$($WP core verify-checksums 2>&1 | grep -v '^Success')
-      CK_REST=$(echo "$CK" | grep -viE "index\.php|doesn't verify against checksums" | grep -v '^$')
-      [[ -z "$CK_REST" ]] && ok "core unchanged" \
-        || { bad "core files modified: $(echo "$CK_REST" | head -3 | tr '\n' ' ')"; TOTAL_HIT=$((TOTAL_HIT+1)); }
+      # "doesn't verify" = content changed -> finding.
+      # "should not exist" = extra file, not in the checksum list for this
+      # version. Usually a leftover from a version change or a dev build, so
+      # it is reported separately instead of as a modification.
+      CK_MOD=$(echo "$CK" | grep -i "doesn't verify" | grep -vi 'index\.php' | grep -v '^$')
+      CK_EXTRA=$(echo "$CK" | grep -i 'should not exist' | grep -v '^$')
+
+      if [[ -n "$CK_MOD" ]]; then
+        bad "core files modified: $(echo "$CK_MOD" | head -3 | tr '\n' ' ')"
+        TOTAL_HIT=$((TOTAL_HIT+1))
+      else
+        ok "core: no modified files"
+      fi
+
+      if [[ -n "$CK_EXTRA" ]]; then
+        N_EXTRA=$(echo "$CK_EXTRA" | grep -c .)
+        N_PHP=$(echo "$CK_EXTRA" | grep -ci '\.php')
+        if [[ "$N_PHP" -gt 0 ]]; then
+          bad "core: ${N_PHP} extra PHP file(s) - these need a look"
+          echo "$CK_EXTRA" | grep -i '\.php' | head -5 | sed 's/^/             /'
+          TOTAL_HIT=$((TOTAL_HIT+1))
+        else
+          printf '    core: %d extra file(s), none of them PHP - typically\n' "$N_EXTRA"
+          printf '    leftovers from a version change. Check with: wp core version --extra\n'
+          echo "$CK_EXTRA" | head -3 | sed 's/^/             /'
+          TOTAL_SUS=$((TOTAL_SUS+1))
+        fi
+      fi
 
       for KIND in plugin theme; do
         OUT=$($WP "$KIND" verify-checksums --all 2>&1)
