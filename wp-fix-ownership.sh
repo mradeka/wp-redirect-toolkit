@@ -75,8 +75,22 @@ printf '  %s\n' "---------------------------------------------------------------
 
 for CONFIG in "${CONFIGS[@]}"; do
   D=$(dirname "$CONFIG")
-  U=$(stat -c '%U' "$CONFIG")
-  G=$(stat -c '%G' "$CONFIG")
+  # Derive the expected owner from the PATH, not from wp-config.php.
+  # Deriving it from the file itself is circular: if wp-config.php is owned by
+  # root, U becomes root and "find ! -user root" reports zero foreign files -
+  # precisely in the case this script is meant to detect.
+  U=$(echo "$CONFIG" | sed -nE 's#^/home/([^/]+)/.*#\1#p')
+  if [[ -z "$U" ]] || ! getent passwd "$U" >/dev/null; then
+    # not a /home/<user>/ layout, or no such account - fall back to the file
+    U=$(stat -c '%U' "$CONFIG")
+    warn "could not derive the site user from the path, using the owner of wp-config.php (${U})"
+  fi
+  G=$(id -gn "$U" 2>/dev/null || stat -c '%G' "$CONFIG")
+
+  # Point it out when wp-config.php itself has the wrong owner - that is what
+  # made the old detection fail.
+  CONF_OWNER=$(stat -c '%U' "$CONFIG")
+  [[ "$CONF_OWNER" != "$U" ]] && warn "wp-config.php is owned by ${CONF_OWNER}, expected ${U}"
   [[ -n "$ONLY" && "$U" != "$ONLY" ]] && continue
 
   N=$(find "$D" ! -user "$U" 2>/dev/null | wc -l)

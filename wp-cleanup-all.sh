@@ -58,7 +58,12 @@ FAILED=(); CLEAN=(); DIRTY=()
 
 for CONFIG in "${INSTALLS[@]}"; do
   WP_PATH=$(dirname "$CONFIG")
-  SITE_USER=$(stat -c '%U' "$CONFIG")
+  # Derive the site user from the PATH, not from wp-config.php: if that file
+  # is owned by root, so would the derived user be - and everything would run
+  # as root, creating root-owned files.
+  SITE_USER=$(echo "$CONFIG" | sed -nE 's#^/home/([^/]+)/.*#\1#p')
+  { [[ -z "$SITE_USER" ]] || ! getent passwd "$SITE_USER" >/dev/null; } \
+    && SITE_USER=$(stat -c '%U' "$CONFIG")
   SITE_HOME=$(getent passwd "$SITE_USER" | cut -d: -f6)
 
   [[ -n "$ONLY" && "$SITE_USER" != "$ONLY" ]] && continue
@@ -86,8 +91,8 @@ for CONFIG in "${INSTALLS[@]}"; do
 
   LOG="${LOGDIR}/$(echo "${WP_PATH}" | tr '/' '_')-${STAMP}.log"
 
-  # Umleitung ausserhalb von sudo: die Logdatei gehoert root, nicht dem
-  # Seitenbenutzer - sonst koennte dieser sie spaeter manipulieren.
+  # Redirect outside of sudo: the log file belongs to root, not the site
+  # user - otherwise that user could tamper with it later.
   { sudo -u "$SITE_USER" -H "$CLEANUP" \
       --path "$WP_PATH" \
       --wp-bin "$SITE_WP" \

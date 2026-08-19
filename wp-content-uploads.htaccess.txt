@@ -1,43 +1,44 @@
 # ============================================================================
 #  wp-content/uploads/.htaccess
 #
-#  Zweite Verteidigungslinie: verhindert die Ausfuehrung hochgeladener
-#  Skripte, selbst wenn die Haupt-.htaccess ueberschrieben wird.
+#  Second line of defence: prevents execution of uploaded scripts even if the
+#  main .htaccess is overwritten.
 #
-#  Ablage: /pfad/zur/installation/wp-content/uploads/.htaccess
-#  Rechte: 644, Eigentuemer = Seitenbenutzer
+#  Place at: /path/to/installation/wp-content/uploads/.htaccess
+#  Mode:     644, owned by the site user
 # ============================================================================
 
-# WICHTIG bei mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
-# Dort laeuft PHP ueber "AddHandler fcgid-script .php" aus dem vhost. Ein
-# "AddType text/plain .php" hier ueberschreibt die Zuordnung und bricht die
-# PHP-Verarbeitung im ganzen Verzeichnisbaum - Uploads im Backend scheitern
-# dann mit "The uploaded file could not be moved to wp-content/uploads/...".
-# Richtig ist RemoveHandler: es entfernt die Zuordnung nur fuer dieses
-# Verzeichnis.
+# IMPORTANT with mod_fcgid / suexec (Virtualmin, Plesk, cPanel):
+# There PHP runs via "AddHandler fcgid-script .php" from the vhost. An
+# "AddType text/plain .php" here overrides that mapping and breaks PHP
+# processing for the whole directory tree - uploads in wp-admin then fail with
+# "The uploaded file could not be moved to wp-content/uploads/...".
+# RemoveHandler is the correct tool: it drops the mapping for this directory
+# only.
 <IfModule mod_mime.c>
     RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.0 .php8.1 .php8.2 .php8.3 .php8.4 .phtml .phps .phar .pht
 </IfModule>
 
-# Zusaetzlich der direkte Zugriffsschutz. Nur Skript-Endungen - Bilder, PDFs
-# und alles andere bleiben abrufbar.
+# Plus direct access protection. Script extensions only - images, PDFs and
+# everything else stay reachable.
 <FilesMatch "\.(php|php[0-9]|php[0-9]\.[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx)$">
     Require all denied
 </FilesMatch>
 
-# Doppelte Endungen ("bild.php.jpg") werden auf manchen Servern trotzdem als
-# PHP ausgefuehrt - deshalb jede Skript-Endung IRGENDWO im Namen sperren.
+# Double extensions ("image.php.jpg") are still executed as PHP on some
+# servers - so block any script extension ANYWHERE in the name.
 <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py)\.">
     Require all denied
 </FilesMatch>
 
-# Nur -Indexes: -ExecCGI und -Includes braeuchten "AllowOverride Options",
-# das viele Panels nur mit einer Whitelist gewaehren.
+# Only -Indexes: -ExecCGI and -Includes would require "AllowOverride Options",
+# which many panels grant only through a whitelist - without it Apache returns
+# 500 for the entire directory.
 Options -Indexes
 
-# SVG-Dateien werden im Browser ausgefuehrt und koennen JavaScript enthalten.
-# Erlaubt ein Plugin SVG-Uploads, sollten sie zumindest nicht inline
-# gerendert, sondern heruntergeladen werden:
+# SVG files are rendered in the browser and can contain JavaScript. If a
+# plugin allows SVG uploads, they should at least be downloaded rather than
+# rendered inline:
 # <FilesMatch "\.svg$">
 #     Header set Content-Disposition "attachment"
 #     Header set Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'"

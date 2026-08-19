@@ -2,175 +2,173 @@
 
 ---
 
-## Zur Benutzung
+## Using the tools
 
-### Kann ich die Skripte gefahrlos ausprobieren?
+### Can I try the scripts safely?
 
-Ja. Ohne `--apply` verändern sie nichts. `wp-db-audit`,
-`check-usrlocalbin-access` und `wp-cron-list` (ohne `--delete`) schreiben
-grundsätzlich nie.
+Yes. Without `--apply` they change nothing. `wp-db-audit`,
+`check-usrlocalbin-access` and `wp-cron-list` (without `--delete`) never write
+at all.
 
-Vor jeder schreibenden Aktion wird gesichert — Datenbank-Dump, Dateikopie oder
-beides.
+A backup is taken before every writing action — database dump, file copy, or
+both.
 
-### Warum muss ich `--domain` nicht angeben?
+### Why do I not have to pass `--domain`?
 
-Weil die Zieldomain sich pro Seite unterscheidet. Im untersuchten Fall trugen
-drei Installationen drei verschiedene Domains derselben Kampagne. Mit fest
-vorgegebener Domain meldet ein Scan betroffene Seiten fälschlich als sauber —
-deshalb liest das Skript sie aus der Nutzlast selbst.
+Because the target domain differs per site. In the case examined, three
+installations carried three different domains of the same campaign. With a
+hard-coded domain a scan reports affected sites as clean — so the script reads
+it from the payload itself.
 
-### Warum als Seitenbenutzer und nicht als root?
+### Why as the site user and not as root?
 
-Weil root-eigene Dateien später Probleme machen. Konkret: Enfold erzeugt seine
-Stylesheets nach `wp-content/uploads/dynamic_avia/`. Gehört dieses Verzeichnis
-plötzlich root, kann das Theme dort nicht mehr schreiben — und die Seite
-verliert ihre Formatierung, ohne dass ein Fehler erscheint.
+Because root-owned files cause trouble later. Concretely: Enfold writes its
+stylesheets to `wp-content/uploads/dynamic_avia/`. If that directory suddenly
+belongs to root, the theme can no longer write there — and the site loses its
+styling without any error appearing.
 
-### Meine Seite leitet nach der Bereinigung immer noch um.
+### My site still redirects after the cleanup.
 
-In dieser Reihenfolge prüfen:
+Check in this order:
 
 ```bash
-curl -s https://DOMAIN/ | grep -c 'SCHADDOMAIN'
+curl -s https://DOMAIN/ | grep -c 'BAD-DOMAIN'
 ```
 
-Ist das 0, liefert der Server sauberes HTML — dann ist es dein Browser-Cache.
-Eine Meta-Refresh-Seite ist voll cachefähig. Privates Fenster oder anderes
-Gerät.
+If that is 0, the server serves clean HTML — then it is your browser cache. A
+meta-refresh page is fully cacheable. Private window or another device.
 
-Ist es größer als 0, siehe [Fehlerbehebung](Fehlerbehebung).
+If it is greater than 0, see [Troubleshooting](Troubleshooting).
 
-### Kann ich einen Lauf rückgängig machen?
+### Can I undo a run?
 
-| Skript | Rückweg |
+| Script | Way back |
 |---|---|
-| `wp-redirect-cleanup` | `wp db import` des Dumps aus dem `--backup`-Verzeichnis |
+| `wp-redirect-cleanup` | `wp db import` of the dump in the `--backup` directory |
 | `wp-harden-htaccess` | `wp-harden-htaccess --restore` |
-| `wp-asset-scan` | `.bak-<zeitstempel>` neben der Datei |
-| `wp-rotate-db-passwords` | rollt bei Fehlschlag selbst zurück; alte Passwörter stehen in `/root/wp-db-credentials.txt` |
-| `wp-move-to-subdir` | Tarball und Dump im `tmp/` des Seitenbenutzers |
+| `wp-asset-scan` | `.bak-<timestamp>` alongside the file |
+| `wp-rotate-db-passwords` | rolls back itself on failure; old passwords are in `/root/wp-db-credentials.txt` |
+| `wp-move-to-subdir` | tarball and dump in the site user's `tmp/` |
+| `wp-fix-ownership` | previously executable files noted under `/root` |
 
 ---
 
-## Zu den Entscheidungen
+## Design decisions
 
-### Warum werden nicht alle Funde automatisch bereinigt?
+### Why are not all findings cleaned automatically?
 
-Weil ein gemeldeter Fund zu viel harmloser ist als eine gelöschte Datei zu
-wenig. Automatisch bereinigt wird nur, was eindeutig ist: die bekannte Nutzlast
-in `post_content`, JS-Zeilen mit einer Domain aus der Sperrliste, Wegwerf-Typen
-in der Datenbank.
+Because one reported finding too many is far more harmless than one deleted
+file too few. Cleaned automatically is only what is unambiguous: the known
+payload in `post_content`, JS lines with a domain from the blocklist,
+disposable row types in the database.
 
-Nicht automatisch: serialisierte Werte in `wp_options`, `postmeta` und
-`comments` — dort zerstört ein blinder Schnitt die Längenangaben. Ebensowenig
-HTML- und PHP-Dateien, die auch legitim sein können.
+Not automatic: serialised values in `wp_options`, `postmeta` and `comments` —
+a blind cut destroys the length prefixes there. Nor HTML and PHP files, which
+may well be legitimate.
 
-### Warum löscht `wp-user-audit` nicht einfach alle Konten, deren Name nicht zum Verzeichnis passt?
+### Why does `wp-user-audit` not just delete every account whose name differs from the directory?
 
-Weil das zu viel trifft. Ein WordPress-Login hat keinen Zusammenhang mit dem
-Systemkonto: Redakteure, Autoren und Shop-Kunden heißen nie wie das
-Home-Verzeichnis. Und `wp user delete` nimmt deren Beiträge mit.
+Because that hits far too much. A WordPress login has no relation to the Unix
+account: editors, authors and shop customers never match the home directory
+name. And `wp user delete` takes their posts with them.
 
-Stattdessen ein Punktesystem aus Rolle, Registrierungsdatum, Mail-Domain,
-Beitragszahl und Namensform. Konten mit eigenen Inhalten werden ohne
-`--reassign` grundsätzlich übersprungen.
+Instead a scoring system across role, registration date, mail domain, post
+count and name shape. Accounts with their own content are skipped entirely
+without `--reassign`.
 
-### Warum löscht `wp-harden-htaccess` bestehende Dateien nicht einfach?
+### Why does `wp-harden-htaccess` not simply delete existing files?
 
-Weil bei fcgid-Sites die PHP-Version in der `.htaccess` steht
-(`AddHandler fcgid-script .php`). Fällt die Zeile weg, läuft die Seite mit der
-Server-Vorgabe — oder PHP wird gar nicht mehr ausgeführt und der Browser lädt
-den Quelltext herunter.
+Because on fcgid sites the PHP version lives in `.htaccess`
+(`AddHandler fcgid-script .php`). Remove that line and the site runs with the
+server default — or PHP stops running and the browser downloads the source.
 
-Umgekehrt wird auch nicht blind alles übernommen: Nach einem Vorfall kann dort
-eine eingeschleuste Regel stehen. Deshalb wird jede Zeile klassifiziert;
-`--inventory` zeigt das Ergebnis.
+Conversely nothing is carried over blindly either: after an incident an
+injected rule may sit in there. Every line is classified; `--inventory` shows
+the result.
 
-### Warum zwei Prüfskripte statt einem?
+### Why two audit scripts instead of one?
 
-Die Trennung folgt der Datenquelle: `wp-db-audit` fragt die Datenbank,
-`wp-asset-scan` sieht sich Dateien an. Früher war beides in einem Skript
-namens `wp-cron-audit` — der Name versprach Cron und lieferte alles.
+The split follows the data source: `wp-db-audit` asks the database,
+`wp-asset-scan` looks at files. Previously both lived in one script called
+`wp-cron-audit` — the name promised cron and delivered everything.
 
-Beide zusammen ergeben das vollständige Bild. Läuft nur eines, bleibt der
-jeweils andere Infektionsweg unentdeckt.
+Together they give the full picture. Run only one and the other infection
+route stays undetected.
 
-### Warum wird der WordPress-Kern nicht nach Schadmustern durchsucht?
+### Why is WordPress core not searched for malicious patterns?
 
-Weil `verify-checksums` die bessere Antwort ist: ein Bytevergleich gegen das
-Original statt einer Mustersuche. Fast alle behobenen Fehlalarme entstanden
-dadurch, dass Verzeichnisse durchsucht wurden, deren Integrität ohnehin
-feststellbar ist — siehe [Fehlalarme](Fehlalarme).
+Because `verify-checksums` is the better answer: a byte comparison against the
+original rather than a pattern search. Almost every false positive that had to
+be fixed came from searching directories whose integrity is verifiable anyway
+— see [False Positives](False-Positives).
 
 ---
 
-## Zur Lage
+## Assessing the situation
 
-### Reicht Bereinigen, oder muss der Server neu?
+### Is cleaning enough, or does the server have to be rebuilt?
 
-Das hängt daran, wie weit der Zugriff reichte.
+It depends on how far the access reached.
 
-**Bereinigen ist vertretbar**, wenn alles auf Datenbankzugriff hindeutet: keine
-veränderten Dateien, saubere Prüfsummen, keine mu-plugins, keine fremden Konten
-— und die Kontrollläufe danach bleiben bei 0.
+**Cleaning is defensible** when everything points at database access: no
+modified files, clean checksums, no mu-plugins, no foreign accounts — and the
+follow-up checks stay at 0.
 
-**Neuaufbau ist die ehrliche Konsequenz**, wenn die Panel-Protokolle eine
-fremde Sitzung mit Browser-Shell zeigen (`/xterm/`, `/filemin/`, `/shell/`).
-Deren Eingaben stehen in keinem Log; was in dieser Zeit geschah, lässt sich
-nicht rekonstruieren.
+**Rebuilding is the honest conclusion** when the panel logs show a foreign
+session with a browser shell (`/xterm/`, `/filemin/`, `/shell/`). Its
+keystrokes appear in no log; what happened during that time cannot be
+reconstructed.
 
-Dann: neuer Host, frisches System, **Inhalte** zurückspielen — Datenbankinhalte
-und Uploads, keine ausführbaren Dateien. Kern, Themes und Plugins aus den
-Originalquellen.
+Then: new host, fresh system, restore **content** — database content and
+uploads, no executable files. Core, themes and plugins from their original
+sources.
 
-### Woran erkenne ich, dass der Zugang noch besteht?
+### How do I know whether access still exists?
 
-Am Kontrolllauf. Steigt die Fundzahl von 0 wieder auf mehr, ist jemand noch
-drin. Dann nicht erneut bereinigen, sondern die Seite offline nehmen:
+From the follow-up check. If the count rises from 0 again, someone is still
+in. Do not clean a second time — take the site offline:
 
 ```bash
-a2dissite DEINE-SEITE.conf && systemctl reload apache2
+a2dissite YOUR-SITE.conf && systemctl reload apache2
 ```
 
-Cron-Hooks sind ein guter Frühindikator: Sie kommen innerhalb einer Stunde
-zurück, wenn Code sie neu anlegt.
+Cron hooks are a good early indicator: they come back within the hour if code
+recreates them.
 
-### Muss ich meine Besucher informieren?
+### Do I have to inform my visitors?
 
-Das ist eine Rechtsfrage, keine technische. In der EU kann eine Meldepflicht
-nach DSGVO Art. 33/34 bestehen, wenn personenbezogene Daten betroffen sind —
-und bei einem Datenbankzugriff auf `wp_users` sind sie das in der Regel. Die
-Frist ist kurz (72 Stunden ab Kenntnis).
+That is a legal question, not a technical one. In the EU a notification duty
+under GDPR Art. 33/34 may apply when personal data is affected — and with
+database access to `wp_users` it usually is. The deadline is short (72 hours
+from becoming aware).
 
-Ob das in deinem Fall greift, kann dir nur jemand mit juristischem Blick auf
-den konkreten Sachverhalt sagen. Für die Bewertung hilfreich: Welche Tabellen
-waren betroffen, gab es Shop- oder Formulardaten, wie lange bestand der
-Zugriff.
+Whether it applies in your case can only be judged by someone with a legal
+view of the specifics. Useful for that assessment: which tables were affected,
+whether shop or form data was involved, and how long the access lasted.
 
 ---
 
-## Zum Projekt
+## About the project
 
-### Kann ich das für andere Kampagnen nutzen?
+### Can I use this for other campaigns?
 
-Teilweise. Die generischen Prüfungen — Cron-Hooks mit Zufallsnamen,
-`home`/`siteurl`-Abgleich, Prüfsummen, PHP an falschen Orten, `auto_prepend` —
-sind kampagnenunabhängig.
+Partly. The generic checks — cron hooks with random names, `home`/`siteurl`
+comparison, checksums, PHP in wrong places, `auto_prepend` — are
+campaign-independent.
 
-Die Bereinigung ist auf das beschriebene Nutzlastmuster zugeschnitten. Bei
-anderem Aufbau greifen die Schnitte nicht, und die Skripte melden das ehrlich,
-statt etwas Falsches zu tun.
+The cleanup is tailored to the payload pattern described here. With a
+different structure the cuts do not apply, and the scripts say so honestly
+rather than doing something wrong.
 
-### Wie melde ich einen Fehlalarm?
+### How do I report a false positive?
 
-[Issue eröffnen](https://github.com/mradeka/wp-redirect-toolkit/issues) mit
-Skript, Meldung, Pfad und — falls bekannt — der Begründung, warum die Datei
-legitim ist. Das ist die nützlichste Art von Rückmeldung; jeder Eintrag im
-Fehlalarm-Katalog hat zu einer Verbesserung geführt.
+[Open an issue](https://github.com/mradeka/wp-redirect-toolkit/issues) with
+the script, the message, the path and — if known — why the file is legitimate.
+That is the most useful kind of feedback; every entry in the false-positive
+catalogue led to an improvement.
 
-### Läuft das auch ohne Virtualmin/Webmin?
+### Does this work without a hosting panel?
 
-Ja. Die einzige Annahme ist der Pfad
-`/home/<benutzer>/public_html[/wordpress]`. Panel-spezifisch sind nur einzelne
-Hinweise in der Ausgabe.
+Yes. The only assumption is the path
+`/home/<user>/public_html[/wordpress]`. Only individual hints in the output are
+panel-specific.

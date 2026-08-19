@@ -26,7 +26,7 @@
 # (disposable types). Rows that afterwards only mention the domain as a bare
 # URL inside real text are reported, never touched.
 #
-# v7: Abbruch statt Blindflug, wenn home UND siteurl dieselbe Domain tragen
+# v7: abort instead of guessing when home AND siteurl carry the same domain
 # v6: fourth pass for cached oEmbed markup; empty posts/pages go to the trash
 # v5: --domain/--url auto-detected; usable unattended from wp-cleanup-all.sh
 # v4: third pass + automatic wp-config.php chmod + guid repair
@@ -141,10 +141,10 @@ if [[ -n "$BAD_DOMAIN" && "$BAD_DOMAIN" != "__none__" ]]; then
   BD_CHK=$(echo "$BAD_DOMAIN" | sed -E 's#^www\.##')
   if [[ "$SH_CHK" == *"$BD_CHK"* && "$HH_CHK" == *"$BD_CHK"* ]]; then
     if [[ -n "$SITE_URL" && -n "$SITE_URL_CORE" ]]; then
-      # Werte wurden explizit uebergeben - dann ist nichts abzuleiten und der
-      # Lauf kann weitergehen, egal wie die Erkennung ausgegangen ist.
-      warn "home und siteurl enthalten beide '${BAD_DOMAIN}' - es wird mit den"
-      warn "uebergebenen Werten gearbeitet (--url / --siteurl)."
+      # Values were passed explicitly - nothing to derive, so the run can
+      # continue regardless of how detection turned out.
+      warn "home and siteurl both contain '${BAD_DOMAIN}' - proceeding with the"
+      warn "values passed explicitly (--url / --siteurl)."
     else
       bad "auto-detection unusable: '${BAD_DOMAIN}' appears in home AND siteurl"
       echo "    home:    ${H_CHK}"
@@ -152,7 +152,7 @@ if [[ -n "$BAD_DOMAIN" && "$BAD_DOMAIN" != "__none__" ]]; then
       echo
       echo "    Zwei moegliche Ursachen:"
       echo "      a) beide Optionen sind tatsaechlich gekapert - dann gibt es"
-      echo "         keinen sauberen Wert zum Ableiten"
+      echo "         no clean value left to derive from"
       echo "      b) erkannt wurde versehentlich die EIGENE Domain - dann waere"
       echo "         ein korrekter Wert als gekapert behandelt worden"
       echo

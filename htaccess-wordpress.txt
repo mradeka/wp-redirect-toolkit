@@ -1,76 +1,75 @@
 # ============================================================================
-#  WordPress .htaccess - Grundkonfiguration mit Absicherung
+#  WordPress .htaccess - baseline with hardening
 #
-#  Ablage:  im Webroot der Installation
-#           - Standardinstallation:      public_html/.htaccess
-#           - Unterverzeichnis-Layout:   public_html/.htaccess  (dieses hier)
-#             und zusaetzlich public_html/wordpress/.htaccess (siehe unten)
+#  Place at:  the webroot of the installation
+#             - standard install:     public_html/.htaccess
+#             - subdirectory layout:  public_html/.htaccess  (this file)
+#               plus public_html/wordpress/.htaccess (see below)
 #
-#  WICHTIG - Reihenfolge:
-#  WordPress verwaltet den Block zwischen "# BEGIN WordPress" und
-#  "# END WordPress" selbst und ueberschreibt ihn beim Speichern der
-#  Permalink-Einstellungen. Alles Eigene gehoert DAVOR oder DANACH,
-#  niemals hinein.
+#  IMPORTANT - ordering:
+#  WordPress manages the block between "# BEGIN WordPress" and
+#  "# END WordPress" itself and overwrites it whenever permalink settings are
+#  saved. Everything of your own belongs BEFORE or AFTER it, never inside.
 #
-#  Voraussetzung: AllowOverride All fuer dieses Verzeichnis. Sonst wird die
-#  gesamte Datei stillschweigend ignoriert:
+#  Requirement: AllowOverride All for this directory. Without it the whole
+#  file is silently ignored:
 #      grep -rh AllowOverride /etc/apache2/sites-enabled/
 #
-#  Nach jeder Aenderung pruefen:
+#  Check after every change:
 #      apachectl configtest && systemctl reload apache2
-#      curl -sI https://DEINE-DOMAIN/ | head -20
+#      curl -sI https://YOUR-DOMAIN/ | head -20
 # ============================================================================
 
 
 # ----------------------------------------------------------------------------
-# 1. Verzeichnisauflistung abschalten
-#    Ohne index-Datei wuerde Apache sonst den Inhalt eines Ordners auflisten.
+# 1. Disable directory listings
+#    Without an index file Apache would otherwise list the directory contents.
 # ----------------------------------------------------------------------------
 Options -Indexes
 
-# ACHTUNG: Jede Options-Direktive braucht "AllowOverride Options" oder "All".
-# Panels (Virtualmin, Plesk, cPanel) setzen dort meist eine Whitelist, in der
-# FollowSymLinks fehlt. Dann quittiert Apache mit
+# NOTE: every Options directive requires "AllowOverride Options" or "All".
+# Panels (Virtualmin, Plesk, cPanel) usually set a whitelist that does not
+# include FollowSymLinks. Apache then answers with
 #     Option FollowSymLinks not allowed here
-# und liefert 500 fuer alles unterhalb - auch fuer CSS und JS.
+# and returns 500 for everything below - including CSS and JS.
 #
-# Deshalb steht hier nur -Indexes. Falls dein vhost mehr erlaubt, kannst du
-# ergaenzen (vorher testen!):
+# That is why only -Indexes is used here. If your vhost allows more, you can
+# add (test first!):
 #     Options +SymLinksIfOwnerMatch -Includes -ExecCGI
-# Pruefen, was erlaubt ist:
+# Check what is permitted:
 #     grep -rh AllowOverride /etc/apache2/sites-enabled/
 
 
 # ----------------------------------------------------------------------------
-# 2. Sensible Dateien sperren
-#    Diese Dateien sind entweder Konfiguration oder verraten Versionsstaende.
+# 2. Block sensitive files
+#    These are either configuration or reveal version information.
 # ----------------------------------------------------------------------------
 <FilesMatch "^(wp-config\.php|wp-config-sample\.php|\.htaccess|\.htpasswd|\.user\.ini|php\.ini|readme\.html|license\.txt|liesmich\.html|wp-config\.php\.bak.*)$">
     Require all denied
 </FilesMatch>
 
-# Debug-Log, Datenbank-Dumps, Archive, Sicherungskopien, Versionsverwaltung.
-# Solche Dateien gehoeren nicht in den Webroot - falls doch eine liegen
-# bleibt, ist sie hierueber wenigstens nicht abrufbar.
+# Debug logs, database dumps, archives, backup copies, version control.
+# Such files do not belong in the webroot - but if one is left behind, at
+# least it is not retrievable.
 <FilesMatch "\.(sql|sql\.gz|tar|tar\.gz|tgz|zip|bak|bakup|backup|old|orig|save|swp|swo|log|phar|env|ini|conf|sh|dist|inc)$">
     Require all denied
 </FilesMatch>
 
-# Punktdateien (.git, .env, .DS_Store ...) - ausser dem ACME-Verzeichnis,
-# das Let's Encrypt fuer die Domainvalidierung braucht.
+# Dot files (.git, .env, .DS_Store ...) - except the ACME directory that
+# Let's Encrypt needs for domain validation.
 RedirectMatch 404 /\.(?!well-known/)
 
-# Verzeichnisse von Versionsverwaltung und Paketmanagern
+# Version control and package manager directories
 RedirectMatch 404 /(\.git|\.svn|\.hg|node_modules|vendor/bin)/
 
 
 # ----------------------------------------------------------------------------
-# 3. PHP-Ausfuehrung dort unterbinden, wo sie nichts zu suchen hat
+# 3. Prevent PHP execution where it has no business
 #
-#    Der wichtigste Einzelpunkt der ganzen Datei. Eine hochgeladene PHP-Datei
-#    in uploads/ ist der klassische Weg fuer eine Hintertuer. Zusaetzlich
-#    gehoert eine eigene .htaccess direkt in wp-content/uploads/ - siehe
-#    Abschnitt am Dateiende.
+#    The single most important point in this file. An uploaded PHP file in
+#    uploads/ is the classic route to a backdoor. In addition, a dedicated
+#    .htaccess belongs directly in wp-content/uploads/ - see the end of this
+#    file.
 # ----------------------------------------------------------------------------
 <FilesMatch "\.(php|php[0-9]|phtml|phps|pht|phar|shtml|cgi|pl|py|asp|aspx|exe)$">
     <If "%{REQUEST_URI} =~ m#/wp-content/(uploads|cache|languages)/#">
@@ -82,13 +81,12 @@ RedirectMatch 404 /(\.git|\.svn|\.hg|node_modules|vendor/bin)/
 # ----------------------------------------------------------------------------
 # 4. XML-RPC
 #
-#    Wird fuer Pingbacks, die klassische WordPress-App und Jetpack gebraucht.
-#    Nutzt du davon nichts, ist die Datei ein reines Angriffsziel: Ueber
-#    system.multicall lassen sich hunderte Anmeldeversuche in einer einzigen
-#    Anfrage buendeln.
+#    Needed for pingbacks, the classic WordPress app and Jetpack. If you use
+#    none of those, the file is a pure attack surface: system.multicall lets
+#    hundreds of login attempts be bundled into a single request.
 #
-#    Standardmaessig aktiv. Kommentiere den Block aus, wenn du die
-#    WordPress-App oder Jetpack einsetzt.
+#    Enabled by default. Comment the block out if you use the WordPress app
+#    or Jetpack.
 # ----------------------------------------------------------------------------
 <Files "xmlrpc.php">
     Require all denied
@@ -96,46 +94,45 @@ RedirectMatch 404 /(\.git|\.svn|\.hg|node_modules|vendor/bin)/
 
 
 # ----------------------------------------------------------------------------
-# 5. Sicherheits-Header
-#    Ergaenzen den Browserschutz. Content-Security-Policy fehlt bewusst -
-#    eine sinnvolle CSP haengt vom Theme und den Plugins ab und muss
-#    individuell erarbeitet werden, sonst zerlegt sie die Seite.
+# 5. Security headers
+#    These complement the browser's own protections. Content-Security-Policy
+#    is deliberately absent - a useful CSP depends on the theme and plugins
+#    and has to be worked out individually, otherwise it breaks the site.
 # ----------------------------------------------------------------------------
 <IfModule mod_headers.c>
-    # Verhindert MIME-Type-Raten (z. B. eine als Bild getarnte HTML-Datei)
+    # Prevent MIME type sniffing (e.g. an HTML file disguised as an image)
     Header always set X-Content-Type-Options "nosniff"
 
-    # Seite darf nicht in fremde Frames eingebettet werden (Clickjacking)
+    # The site must not be embedded in foreign frames (clickjacking)
     Header always set X-Frame-Options "SAMEORIGIN"
 
-    # Referrer nur an dieselbe Herkunft in voller Laenge
+    # Send the full referrer only to the same origin
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
-    # Geraetezugriffe abschalten, die eine Website normalerweise nicht braucht
+    # Turn off device access a website normally does not need
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
 
-    # HSTS - erst aktivieren, wenn HTTPS auf ALLEN Subdomains sicher laeuft.
-    # Ein Rueckweg ist waehrend der max-age nicht moeglich.
+    # HSTS - only enable once HTTPS works reliably on ALL subdomains.
+    # There is no way back during max-age.
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-    # PHP-Version nicht ausplaudern
+    # Do not advertise the PHP version
     Header always unset X-Powered-By
     Header always unset X-Pingback
 </IfModule>
 
-# Server-Signatur reduzieren (wirkt nur, wenn nicht global ueberschrieben)
+# Reduce the server signature (only effective if not overridden globally)
 ServerSignature Off
 
 
 # ----------------------------------------------------------------------------
-# 6. Benutzer-Aufzaehlung erschweren
-#    ?author=1 leitet normalerweise auf /author/benutzername/ um und verraet
-#    damit den Anmeldenamen. Der REST-Endpunkt /wp-json/wp/v2/users ebenso.
+# 6. Make user enumeration harder
+#    ?author=1 normally redirects to /author/username/ and thereby reveals the
+#    login name. The REST endpoint /wp-json/wp/v2/users does the same.
 #
-#    Hinweis: Den REST-Endpunkt zu sperren ist unbedenklich, solange kein
-#    Plugin ihn oeffentlich braucht. Der Block-Editor nutzt ihn angemeldet
-#    weiter - die Regel greift nur fuer nicht angemeldete Zugriffe nicht
-#    unterscheidbar, deshalb hier nur die Autoren-Abfrage.
+#    Note: blocking the REST endpoint is safe only as long as no plugin needs
+#    it publicly. The block editor keeps using it while logged in, and the
+#    rule cannot tell the two apart - so only the author query is handled here.
 # ----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
     RewriteEngine On
@@ -147,8 +144,8 @@ ServerSignature Off
 
 
 # ----------------------------------------------------------------------------
-# 7. Komprimierung und Browser-Caching
-#    Kein Sicherheitsthema, aber der groesste Hebel fuer die Ladezeit.
+# 7. Compression and browser caching
+#    Not a security topic, but the biggest lever for load time.
 # ----------------------------------------------------------------------------
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/plain text/html text/xml text/css
@@ -174,15 +171,15 @@ ServerSignature Off
     ExpiresByType application/javascript    "access plus 1 year"
 </IfModule>
 
-# Zeichensatz, damit Umlaute ohne Meta-Angabe korrekt ankommen
+# Character set, so that special characters arrive correctly without a meta tag
 AddDefaultCharset UTF-8
 
 
 # ============================================================================
 # BEGIN WordPress
-# Die Anweisungen zwischen "BEGIN WordPress" und "END WordPress" werden
-# dynamisch erzeugt und sollten nur ueber WordPress-Filter geaendert werden.
-# Aenderungen hier werden ueberschrieben.
+# The directives between "BEGIN WordPress" and "END WordPress" are generated
+# dynamically and should only be modified via WordPress filters. Changes here
+# will be overwritten.
 # ============================================================================
 <IfModule mod_rewrite.c>
 RewriteEngine On
@@ -197,14 +194,14 @@ RewriteRule . /index.php [L]
 
 
 # ============================================================================
-#  ZUSATZDATEIEN - separat anlegen, nicht hier einfuegen
+#  ADDITIONAL FILES - create separately, do not paste here
 # ============================================================================
 #
 #  wp-content/uploads/.htaccess
 #  ----------------------------
-#  Zweite Verteidigungslinie fuer den wichtigsten Punkt. Auch wenn Abschnitt 3
-#  greift: doppelt haelt besser, und diese Datei wirkt selbst dann, wenn die
-#  Hauptdatei einmal ueberschrieben wird.
+#  Second line of defence for the most important point. Even though section 3
+#  covers it: belt and braces, and this file keeps working if the main file is
+#  ever overwritten.
 #
 #      <IfModule mod_mime.c>
 #          RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .php8.3 .phtml .phps .phar
@@ -214,15 +211,15 @@ RewriteRule . /index.php [L]
 #      </FilesMatch>
 #      Options -Indexes
 #
-#  KEIN "AddType text/plain .php" verwenden: bei mod_fcgid ueberschreibt das
-#  die Handler-Zuordnung aus dem vhost und bricht die PHP-Verarbeitung im
-#  ganzen Baum - Uploads scheitern dann mit "could not be moved".
+#  Do NOT use "AddType text/plain .php": with mod_fcgid that overrides the
+#  handler mapping from the vhost and breaks PHP for the whole tree - uploads
+#  then fail with "could not be moved".
 #
 #
 #  wp-includes/.htaccess  (optional)
 #  ---------------------------------
-#  Direktaufrufe von Kerndateien unterbinden. Vorsicht: ms-files.php wird bei
-#  Multisite gebraucht, wp-tinymce.php vom Editor.
+#  Prevent direct calls to core files. Careful: ms-files.php is needed for
+#  multisite, wp-tinymce.php by the editor.
 #
 #      <FilesMatch "^(wp-tinymce\.php|ms-files\.php)$">
 #          Require all granted
@@ -232,10 +229,10 @@ RewriteRule . /index.php [L]
 #      </FilesMatch>
 #
 #
-#  Unterverzeichnis-Layout (Kern in public_html/wordpress/)
-#  --------------------------------------------------------
-#  Diese Datei bleibt im Webroot. Im Kernverzeichnis liegt zusaetzlich eine
-#  eigene .htaccess mit RewriteBase auf das Unterverzeichnis:
+#  Subdirectory layout (core in public_html/wordpress/)
+#  ----------------------------------------------------
+#  This file stays in the webroot. The core directory gets its own .htaccess
+#  with RewriteBase pointing at the subdirectory:
 #
 #      # BEGIN WordPress
 #      <IfModule mod_rewrite.c>
@@ -249,15 +246,15 @@ RewriteRule . /index.php [L]
 #      # END WordPress
 #
 #
-#  wp-admin absichern (optional, wirksamer als alles andere)
-#  ---------------------------------------------------------
-#  Bei fester IP-Adresse:
+#  Protecting wp-admin (optional, more effective than anything else)
+#  -----------------------------------------------------------------
+#  With a static IP address:
 #
 #      <Files "wp-login.php">
 #          Require ip 203.0.113.5
 #      </Files>
 #
-#  Bei wechselnder IP stattdessen Basic Auth vor wp-login.php:
+#  With a changing IP, use basic auth in front of wp-login.php instead:
 #
 #      htpasswd -c /home/SITE/.htpasswd adminname
 #
@@ -268,18 +265,17 @@ RewriteRule . /index.php [L]
 #          Require valid-user
 #      </Files>
 #
-#  Achtung: Bei aktivem Basic Auth funktionieren Anwendungspasswoerter und
-#  die REST-API-Authentifizierung nicht mehr - WordPress meldet das im
-#  Website-Zustand.
+#  Careful: with basic auth active, application passwords and REST API
+#  authentication stop working - WordPress reports this in Site Health.
 #
 #
-#  Was hier bewusst NICHT steht
-#  ----------------------------
-#  - Sperre von /wp-json/ insgesamt: bricht den Block-Editor und viele Plugins
-#  - "Content-Security-Policy": muss pro Theme erarbeitet werden, sonst weisse
-#    Seite. Erst im Report-Only-Modus testen.
-#  - Blockieren von User-Agents oder Laendern: erzeugt mehr Fehlalarme als
-#    Nutzen und veraltet schnell
-#  - php_value-Direktiven: funktionieren nur mit mod_php, nicht mit PHP-FPM.
-#    Dort gehoeren solche Einstellungen in .user.ini
+#  What is deliberately NOT here
+#  -----------------------------
+#  - Blocking /wp-json/ entirely: breaks the block editor and many plugins
+#  - "Content-Security-Policy": must be worked out per theme, otherwise a
+#    blank page. Test in report-only mode first.
+#  - Blocking user agents or countries: creates more false positives than
+#    value and goes stale quickly
+#  - php_value directives: these only work with mod_php, not with PHP-FPM.
+#    There such settings belong in .user.ini
 # ============================================================================

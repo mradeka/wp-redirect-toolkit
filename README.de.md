@@ -11,6 +11,9 @@ Werkzeuge zur Analyse und Bereinigung einer WordPress-Kompromittierung, bei der
 eine Weiterleitung **direkt in die Datenbank** geschrieben wurde — ohne
 Veränderung einer einzigen PHP-Datei.
 
+Anleitungen, Fehlerbehebung und der Katalog bekannter Fehlalarme stehen im
+[Wiki](https://github.com/mradeka/wp-redirect-toolkit/wiki) (englisch).
+
 Entstanden während eines realen Vorfalls auf einem Host mit zehn
 WordPress-Installationen. Der vollständige Hergang samt Beweisführung steht in
 [INCIDENT.md](INCIDENT.md).

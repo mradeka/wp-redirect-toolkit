@@ -12,6 +12,15 @@ versioning follows [SemVer](https://semver.org/).
   `README.de.md`
 - Classification identifiers in `wp-harden-htaccess` are English
   (`dangerous`, `options-risk`, `external-redirect`, `unknown`, …)
+- `SECURITY.md`, `CONTRIBUTING.md` and `CHANGELOG.md` are English — they
+  address contributors and reporters, not only German readers
+- The `.htaccess` templates and `blocklist-domains.txt` are English; they are
+  copied onto servers directly
+- The wiki is now English; page names changed accordingly
+  (`Schnellstart` → `Quickstart`, `Fehlalarme` → `False-Positives`, …)
+- Markers in the generated `.htaccess` are English; the previous German
+  markers are still recognised when parsing, so blocks do not stack
+- `INSTALL.md`, `INCIDENT.md` and `README.de.md` remain German
 
 ### Added
 
@@ -22,6 +31,16 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Fixed
 
+- **Site user is derived from the path, not from `wp-config.php`.** Deriving
+  it from that file is circular: if `wp-config.php` is owned by root, the
+  derived user becomes root and `find ! -user root` reports zero foreign
+  files — exactly in the case `wp-fix-ownership` is meant to detect. The other
+  scripts would have run as root and created root-owned files. All scripts now
+  take the user from `/home/<user>/…` and fall back to the file owner only for
+  other layouts.
+- `wp-asset-scan` distinguishes `doesn't verify` (content changed → finding)
+  from `should not exist` (extra file → note, unless it is PHP)
+- Fixed a mangled timestamp in the "PHP files changed in the last 7 days" list
 - Removed `Options +FollowSymLinks` from all `.htaccess` templates — it needs
   `AllowOverride Options`, which panels usually do not grant, and caused a 500
 - Replaced `AddType text/plain .php` with `RemoveHandler` — on fcgid the

@@ -1,19 +1,19 @@
 ### wp-redirect-toolkit
 
-**Einstieg**
+**Getting started**
 - [Start](Home)
-- [Schnellstart](Schnellstart)
-- [Playbook: Vorfall](Playbook-Vorfall)
+- [Quickstart](Quickstart)
+- [Incident Playbook](Incident-Playbook)
 
-**Nachschlagen**
-- [Skript-Referenz](Skripte)
-- [Bekannte Fehlalarme](Fehlalarme)
-- [Fehlerbehebung](Fehlerbehebung)
+**Reference**
+- [Script Reference](Script-Reference)
+- [Known False Positives](False-Positives)
+- [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)
 
-**Hintergrund**
-- [Anatomie des Angriffs](Anatomie-des-Angriffs)
-- [Absicherung](Absicherung)
+**Background**
+- [Anatomy of the Attack](Attack-Anatomy)
+- [Hardening](Hardening)
 
 **Repository**
 - [README (en)](https://github.com/mradeka/wp-redirect-toolkit#readme)

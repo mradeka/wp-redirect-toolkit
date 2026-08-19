@@ -1,57 +1,59 @@
-# Wiki veröffentlichen
+# Publishing the wiki
 
-Diese Datei gehört **nicht** ins Wiki — sie beschreibt nur, wie die übrigen
-Seiten dorthin kommen. Vor dem Push löschen oder ignorieren.
+This file does **not** belong in the wiki — it only describes how the other
+pages get there. Delete or ignore it before pushing.
 
-## Einmalig: Wiki aktivieren
+## One-off: enable the wiki
 
-Auf GitHub im Repository → **Settings** → **Features** → Haken bei **Wikis**.
-Dann im Reiter **Wiki** einmal *Create the first page* anklicken und speichern
-— vorher existiert das Wiki-Repository nicht und lässt sich nicht klonen.
+On GitHub go to the repository → **Settings** → **Features** → tick **Wikis**.
+Then open the **Wiki** tab, click *Create the first page* and save it — before
+that the wiki repository does not exist and cannot be cloned.
 
-## Seiten hochladen
+## Uploading the pages
 
 ```bash
 git clone https://github.com/mradeka/wp-redirect-toolkit.wiki.git
 cd wp-redirect-toolkit.wiki
 
-cp /pfad/zu/wiki/*.md .
+cp /path/to/wiki-en/*.md .
 rm -f PUBLISH.md
 
 git add -A
-git commit -m "Wiki: Playbook, Skript-Referenz, Fehlalarme, Absicherung"
+git commit -m "Wiki: playbook, script reference, false positives, hardening"
 git push
 ```
 
-## Struktur
+## Structure
 
-| Datei | Wird zu |
+| File | Becomes |
 |---|---|
-| `Home.md` | Startseite |
-| `_Sidebar.md` | Navigation rechts (auf allen Seiten) |
-| `_Footer.md` | Fußzeile (auf allen Seiten) |
-| `Schnellstart.md` | Seite „Schnellstart" |
-| `Playbook-Vorfall.md` | Seite „Playbook Vorfall" |
-| `Skripte.md`, `Fehlalarme.md`, `Fehlerbehebung.md`, `FAQ.md`, `Anatomie-des-Angriffs.md`, `Absicherung.md` | jeweils eine Seite |
+| `Home.md` | landing page |
+| `_Sidebar.md` | navigation on the right (every page) |
+| `_Footer.md` | footer (every page) |
+| `Quickstart.md` | page "Quickstart" |
+| `Incident-Playbook.md` | page "Incident Playbook" |
+| `Script-Reference.md`, `False-Positives.md`, `Troubleshooting.md`, `FAQ.md`, `Attack-Anatomy.md`, `Hardening.md` | one page each |
 
-Interne Links funktionieren über den Dateinamen ohne Endung:
-`[Fehlalarme](Fehlalarme)`. Bindestriche im Dateinamen bleiben im Link
-erhalten, werden in der Überschrift aber als Leerzeichen angezeigt.
+Internal links work via the filename without extension:
+`[False Positives](False-Positives)`. Hyphens stay in the link but are shown
+as spaces in the heading.
 
-## Abgrenzung zum README
+## Relation to the README
 
-| | Inhalt |
+| | Content |
 |---|---|
-| README | Was das Projekt ist, Installation, Optionstabellen |
-| INSTALL.md | Ausführliche Installation, Voraussetzungen, Sonderfälle |
-| INCIDENT.md | Der dokumentierte Vorfall als Bericht |
-| Wiki | Anleitungen, Nachschlagewerk, Fehlalarme, FAQ |
+| README.md | what the project is, installation, option tables (English) |
+| README.de.md | German translation |
+| INSTALL.md | detailed installation, prerequisites, edge cases (German) |
+| INCIDENT.md | the documented incident as a report (German) |
+| Wiki | guides, reference, false positives, FAQ (English) |
 
-Bewusst doppelt: die Kurzinstallation und die Skriptoptionen. Wer im Wiki
-landet, soll nicht erst ins README wechseln müssen.
+Deliberately duplicated: the short installation and the script options.
+Someone landing in the wiki should not have to switch to the README first.
 
-## Pflege
+## Maintenance
 
-Ändert sich eine Option, sind zwei Stellen zu aktualisieren: `README.md` im
-Hauptrepository und `Skripte.md` im Wiki. Ein neuer Fehlalarm gehört in
-`Fehlalarme.md` — mit Pfad, Grund und der Verbesserung, die daraus folgte.
+When an option changes, two places need updating: `README.md` in the main
+repository and `Script-Reference.md` in the wiki. A new false positive belongs
+in `False-Positives.md` — with the path, the reason, and the improvement that
+followed from it.

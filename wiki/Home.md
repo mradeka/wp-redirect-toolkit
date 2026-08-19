@@ -1,89 +1,86 @@
 # wp-redirect-toolkit
 
-Werkzeuge zur Analyse und Bereinigung einer WordPress-Kompromittierung, bei der
-eine Weiterleitung **direkt in die Datenbank** geschrieben wurde — ohne
-Veränderung einer einzigen PHP-Datei.
+Tools to analyse and clean a WordPress compromise where a redirect was written
+**straight into the database** — without modifying a single PHP file.
 
-Dieses Wiki ist deutsch; die Skriptausgaben sind englisch.
-
-Entstanden während eines realen Vorfalls auf einem Host mit zehn
-WordPress-Installationen. Jedes Erkennungsmuster ist gegen echte Befunde
-**und** gegen legitime Gegenbeispiele geprüft.
+Built during a real incident on a host with ten WordPress installations. Every
+detection pattern is tested against actual findings **and** against legitimate
+counter-examples.
 
 ---
 
-## Wo willst du anfangen?
+## Where do you want to start?
 
-**„Meine Seite leitet auf eine fremde Domain um."**
-→ [Playbook: Vorfall](Playbook-Vorfall) — der Ablauf von der ersten Diagnose
-bis zur Kontrolle am Folgetag.
+**"My site redirects to a foreign domain."**
+→ [Incident Playbook](Incident-Playbook) — the sequence from first diagnosis
+to the follow-up check the next day.
 
-**„Ich will nur wissen, ob etwas nicht stimmt."**
-→ [Schnellstart](Schnellstart) — drei Befehle, die nichts verändern.
+**"I just want to know whether something is wrong."**
+→ [Quickstart](Quickstart) — three commands that change nothing.
 
-**„Das Skript meldet eine Datei, die legitim aussieht."**
-→ [Bekannte Fehlalarme](Fehlalarme) — Katalog der Fälle, die harmlos sind,
-samt Begründung.
+**"The script reports a file that looks legitimate."**
+→ [Known False Positives](False-Positives) — the catalogue of harmless cases,
+with reasoning.
 
-**„Ein Befehl schlägt fehl."**
-→ [Fehlerbehebung](Fehlerbehebung)
+**"A command fails."**
+→ [Troubleshooting](Troubleshooting)
 
-**„Was macht welches Skript?"**
-→ [Skript-Referenz](Skripte)
+**"What does each script do?"**
+→ [Script Reference](Script-Reference)
 
-**„Wie verhindere ich das künftig?"**
-→ [Absicherung](Absicherung)
+**"How do I prevent this in future?"**
+→ [Hardening](Hardening)
 
-**„Wie hat der Angreifer das gemacht?"**
-→ [Anatomie des Angriffs](Anatomie-des-Angriffs)
-
----
-
-## Die Grundidee in drei Sätzen
-
-Die Nutzlast steht in der Datenbank, nicht in Dateien. `post_modified` blieb
-unverändert, betroffen waren Zeilentypen, die WordPress so nie schreibt, und
-`wp core verify-checksums` meldete nichts — es gab also keinen PHP-Backdoor,
-sondern jemand hatte Datenbankzugriff.
-
-Die Zieldomain unterscheidet sich **pro Seite**. Ein Scan mit fest
-vorgegebener Domain meldet betroffene Seiten fälschlich als sauber; deshalb
-liest das Bereinigungsskript sie aus der Nutzlast selbst.
-
-Nach der Bereinigung leitet der Browser oft weiter, obwohl der Server sauberes
-HTML liefert. Eine Meta-Refresh-Seite ist voll cachefähig — im privaten Fenster
-oder mit `curl` gegenprüfen.
+**"How did the attacker do it?"**
+→ [Anatomy of the Attack](Attack-Anatomy)
 
 ---
 
-## Zwei Prüfskripte, getrennt nach Datenquelle
+## The idea in three sentences
+
+The payload lives in the database, not in files. `post_modified` was
+untouched, row types WordPress never writes that way were affected, and
+`wp core verify-checksums` reported nothing — so there was no PHP backdoor,
+someone had database access.
+
+The target domain differs **per site**. A scan with a hard-coded domain
+reports affected sites as clean, which is why the cleanup script reads it from
+the payload itself.
+
+After cleaning, the browser often keeps redirecting although the server
+returns clean HTML. A meta-refresh page is fully cacheable — verify in a
+private window or with `curl`.
+
+---
+
+## Two audit scripts, split by data source
 
 | | `wp-db-audit` | `wp-asset-scan` |
 |---|---|---|
-| Quelle | Datenbank und WP-Optionen | Dateisystem |
-| Prüft | Cron-Hooks, Nutzlast in `wp_posts`, `home`/`siteurl`, Konten | JS-Injektionen, Landeseiten, Loader, PHP an falscher Stelle, mu-plugins, Verschleierung, Prüfsummen |
-| Ändert etwas | nie | nur mit `--apply` |
+| Source | database and WP options | filesystem |
+| Checks | cron hooks, payload in `wp_posts`, `home`/`siteurl`, accounts | JS injections, landing pages, loaders, PHP in wrong places, mu-plugins, obfuscation, checksums |
+| Writes | never | only with `--apply` |
 
-Läuft nur eines von beiden, bleibt der jeweils andere Infektionsweg
-unentdeckt.
-
----
-
-## Grundsätze
-
-- **Trockenlauf ist der Standard.** Jede schreibende Aktion hängt an `--apply`.
-- **Sichern vor Ändern.** Datenbank-Dump oder Dateikopie, bevor etwas
-  überschrieben wird.
-- **Nur Eindeutiges automatisch bereinigen.** Alles Mehrdeutige wird gemeldet,
-  nicht angefasst.
-- **Prüfsumme vor Mustersuche.** Wo `verify-checksums` greift, ist das die
-  bessere Antwort — und der Grund für fast alle behobenen Fehlalarme.
+Run only one of them and the other infection route stays undetected.
 
 ---
 
-## Wichtiger Hinweis
+## Principles
 
-Bei einer Kompromittierung mit root-Zugriff ist **keine** Bereinigung
-vollständig. Diese Werkzeuge helfen beim Aufräumen und beim Verstehen — sie
-ersetzen im Zweifel nicht das Neuaufsetzen des Servers. Siehe
-[Playbook: Vorfall](Playbook-Vorfall), Abschnitt „Wann Neuaufbau".
+- **Dry run is the default.** Every writing action sits behind `--apply`.
+- **Back up before changing.** A database dump or file copy before anything is
+  overwritten.
+- **Only clean unambiguous findings automatically.** Anything ambiguous is
+  reported, not touched.
+- **Checksums before pattern matching.** Where `verify-checksums` applies it is
+  the better answer — and the reason behind almost every false positive that
+  had to be fixed.
+
+---
+
+## Important note
+
+With a root-level compromise **no** cleanup is complete. These tools help with
+cleaning up and with understanding — in case of doubt they do not replace
+rebuilding the server. See [Incident Playbook](Incident-Playbook), section
+"When to rebuild".

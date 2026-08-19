@@ -9,7 +9,12 @@ Tools to analyse and clean a WordPress compromise where a redirect was written
 **straight into the database** — without modifying a single PHP file.
 
 Built during a real incident on a host with ten WordPress installations. The
-full account, including the reasoning, is in [INCIDENT.md](INCIDENT.md).
+full account, including the reasoning, is in [INCIDENT.md](INCIDENT.md)
+(German).
+
+Guides, a troubleshooting reference and the catalogue of known false positives
+live in the
+[wiki](https://github.com/mradeka/wp-redirect-toolkit/wiki).
 
 Every script is **dry run by default** and writes nothing until `--apply` is
 given. A backup is taken before any change.

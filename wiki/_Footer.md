@@ -1,6 +1,6 @@
-Fehlalarm gefunden oder eine nicht erkannte Variante?
-[Issue eröffnen](https://github.com/mradeka/wp-redirect-toolkit/issues) —
-Rückmeldungen aus echten Vorfällen sind das Wertvollste an diesem Projekt.
+Found a false positive, or a variant that was not detected?
+[Open an issue](https://github.com/mradeka/wp-redirect-toolkit/issues) —
+feedback from real incidents is the most valuable part of this project.
 
-Sicherheitsprobleme **in diesen Skripten** bitte nicht öffentlich, sondern über
-`Security` → `Report a vulnerability`.
+Security problems **in these scripts** should not be public issues; use
+`Security` → `Report a vulnerability` instead.

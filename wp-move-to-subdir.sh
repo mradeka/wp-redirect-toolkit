@@ -59,7 +59,11 @@ WP="${WP_BIN} --path=${SRC} --skip-plugins --skip-themes"
 hr "Preflight"
 [[ -f "${SRC}/wp-config.php" ]] || die "No wp-config.php in ${SRC} - nothing to move (already a subdir install?)"
 [[ -e "$DST" ]] && die "${DST} already exists - refusing to merge into it"
-SITE_USER=$(stat -c '%U' "${SRC}/wp-config.php")
+# Derive from the PATH, not from wp-config.php - if that file is owned by root
+# the move would recreate everything as root.
+SITE_USER=$(echo "$SRC" | sed -nE 's#^/home/([^/]+)/.*#\1#p')
+{ [[ -z "$SITE_USER" ]] || ! getent passwd "$SITE_USER" >/dev/null; } \
+  && SITE_USER=$(stat -c '%U' "${SRC}/wp-config.php")
 SITE_GROUP=$(stat -c '%G' "${SRC}/wp-config.php")
 [[ $EUID -ne 0 && "$(id -un)" != "$SITE_USER" ]] && die "Run as root or as ${SITE_USER}"
 

@@ -67,7 +67,12 @@ DIRTY_SITES=()
 
 for CONFIG in "${CONFIGS[@]}"; do
   WP_PATH=$(dirname "$CONFIG")
-  SITE_USER=$(stat -c '%U' "$CONFIG")
+  # Derive the site user from the PATH, not from wp-config.php: if that file
+  # is owned by root, so would the derived user be - and everything would run
+  # as root, creating root-owned files.
+  SITE_USER=$(echo "$CONFIG" | sed -nE 's#^/home/([^/]+)/.*#\1#p')
+  { [[ -z "$SITE_USER" ]] || ! getent passwd "$SITE_USER" >/dev/null; } \
+    && SITE_USER=$(stat -c '%U' "$CONFIG")
   SITE_HOME=$(getent passwd "$SITE_USER" | cut -d: -f6)
   SITE_FINDINGS=0
 
