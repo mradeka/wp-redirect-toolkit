@@ -2,6 +2,9 @@
 #
 # wp-user-audit.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Lists the WordPress accounts of every install under
 # /home/<user>/public_html/wordpress and flags the ones that look
 # attacker-created.
@@ -57,7 +60,7 @@ while [[ $# -gt 0 ]]; do
     --reassign) REASSIGN="$2"; shift 2 ;;
     --shuffle-salts) SHUFFLE=1; shift ;;
     --yes)      ASSUME_YES=1; shift ;;
-    -h|--help)  sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,43p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

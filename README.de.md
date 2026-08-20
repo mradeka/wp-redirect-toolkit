@@ -686,6 +686,10 @@ Sicherheitsprobleme **in diesen Skripten** bitte nicht als öffentliches Issue,
 sondern über die private Meldefunktion von GitHub — siehe
 [SECURITY.md](SECURITY.md) (englisch).
 
+## Version
+
+Aktuelle Fassung: **1.2.0** — siehe [CHANGELOG.md](CHANGELOG.md).
+
 ## Lizenz
 
 MIT

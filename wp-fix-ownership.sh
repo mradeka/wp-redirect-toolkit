@@ -2,6 +2,9 @@
 #
 # wp-fix-ownership.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Checks ownership and permissions of every WordPress install under
 # /home/<user>/public_html[/wordpress], then lets you select which sites
 # to fix.
@@ -44,7 +47,7 @@ while [[ $# -gt 0 ]]; do
     --yes)      ASSUME_YES=1; shift ;;
     --only)     ONLY="$2"; shift 2 ;;
     --no-chmod) DO_CHMOD=0; shift ;;
-    -h|--help)  sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,33p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

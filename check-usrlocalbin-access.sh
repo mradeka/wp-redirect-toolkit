@@ -2,6 +2,9 @@
 #
 # check-usrlocalbin-access.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # For every user that owns a WordPress install (or every /home/* account with
 # --all), checks whether /usr/local/bin and the tools in it are actually
 # usable under that account:
@@ -27,7 +30,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --bin) BIN="$2"; shift 2 ;;
     --all) ALL=1; shift ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

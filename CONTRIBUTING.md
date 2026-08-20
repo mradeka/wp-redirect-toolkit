@@ -39,6 +39,10 @@ domains on suspicion alone.
 - **Do not swallow error messages.** No `2>/dev/null` where the user needs the
   cause.
 - **No `--force` without a prompt** when deleting real content.
+- **Do not use bash's reserved variable names** for your own arrays or
+  variables: `GROUPS`, `SECONDS`, `RANDOM`, `LINENO`, `PIPESTATUS`,
+  `FUNCNAME`, `UID`, `EUID`, `PPID`, `REPLY`, `OPTIND`, `OPTARG`, `PWD`.
+  Assigning to them fails and can terminate a loop silently, with exit code 0.
 
 ## Before opening a pull request
 

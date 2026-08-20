@@ -579,6 +579,10 @@ hurts.
 
 With a root-level compromise no cleanup is complete. When in doubt, rebuild.
 
+## Version
+
+Current release: **1.2.0** — see [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT

@@ -2,6 +2,9 @@
 #
 # wp-redirect-cleanup.sh   (v7)
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Scans and cleans a WordPress install infected with a database-injected
 # redirect payload of the form:
 #
@@ -65,7 +68,7 @@ APPLY=0
 BACKUP_DIR="${HOME}/tmp"
 WP_BIN="${WP_BIN:-wp}"
 
-usage() { sed -n '2,50p' "$0"; exit "${1:-1}"; }
+usage() { sed -n '2,59p' "$0"; exit "${1:-1}"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

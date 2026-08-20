@@ -32,6 +32,14 @@ jobs:
             bash "$f" --help > /dev/null
           done
 
+      - name: Reserved bash variable names
+        run: |
+          if grep -nE '^[[:space:]]*(GROUPS|SECONDS|RANDOM|LINENO|PIPESTATUS|FUNCNAME|UID|EUID|PPID|REPLY|OPTIND|OPTARG|PWD|OLDPWD)(\+)?=' *.sh; then
+            echo "Assignment to a reserved bash variable - this silently breaks loops."
+            exit 1
+          fi
+          echo "no reserved variable names assigned"
+
       - name: Refuse to ship secrets
         run: |
           if grep -rInE '(password|passwd|secret)[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'$]{6,}' \

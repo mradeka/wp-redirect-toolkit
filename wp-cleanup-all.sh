@@ -2,6 +2,9 @@
 #
 # wp-cleanup-all.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Discovers every WordPress install under /home/*/public_html (both the
 # .../public_html and .../public_html/wordpress layouts) and runs
 # wp-redirect-cleanup against each one, as that site's own user.

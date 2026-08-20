@@ -2,6 +2,9 @@
 #
 # wp-asset-scan.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Checks everything that lives in the FILESYSTEM. Counterpart to wp-db-audit,
 # which checks the database - the split follows the data source, not topic.
 #
@@ -49,7 +52,7 @@ while [[ $# -gt 0 ]]; do
     --list)       LIST="$2"; shift 2 ;;
     --apply)      APPLY=1; shift ;;
     --suspicious) SHOW_SUSPECT=1; shift ;;
-    -h|--help)    sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,39p' "$0"; exit 0 ;;
     *) echo "Unbekannte Option: $1"; exit 1 ;;
   esac
 done

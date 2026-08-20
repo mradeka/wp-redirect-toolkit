@@ -2,6 +2,9 @@
 #
 # apply-blocklist.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Turns blocklist-domains.txt into blocking rules, or searches the
 # WordPress installations for those domains.
 #

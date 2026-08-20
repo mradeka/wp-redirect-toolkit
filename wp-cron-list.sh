@@ -2,6 +2,9 @@
 #
 # wp-cron-list.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Runs `wp cron event list` against every WordPress install under
 # /home/<user>/public_html/wordpress (and /home/<user>/public_html) and prints
 # one table per site. Read-only - changes nothing.
@@ -29,7 +32,7 @@ while [[ $# -gt 0 ]]; do
     --only)       ONLY="$2"; shift 2 ;;
     --suspicious) SUSPICIOUS_ONLY=1; shift ;;
     --delete)     DELETE=1; shift ;;
-    -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

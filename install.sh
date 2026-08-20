@@ -14,7 +14,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --prefix)    PREFIX="$2"; shift 2 ;;
     --uninstall) UNINSTALL=1; shift ;;
-    -h|--help)   sed -n '2,7p' "$0"; exit 0 ;;
+    -h|--help)   sed -n '2,5p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -34,6 +34,7 @@ SCRIPTS=(
   "apply-blocklist:755"
   "wp-harden-htaccess:755"
   "wp-fix-ownership:755"
+  "wp-health-check:755"
   "wp-rotate-db-passwords:700"
 )
 
@@ -52,6 +53,7 @@ if [[ -e "${PREFIX}/wp-cron-audit" ]]; then
   rm -f "${PREFIX}/wp-cron-audit" && echo "  removed: ${PREFIX}/wp-cron-audit (now named wp-db-audit)"
 fi
 
+echo "wp-redirect-toolkit 1.2.0"
 echo "== Installing to ${PREFIX} =="
 FAIL=0
 mkdir -p "$PREFIX" || { echo "Cannot create target directory ${PREFIX}."; exit 1; }

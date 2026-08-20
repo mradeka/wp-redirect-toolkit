@@ -2,6 +2,9 @@
 #
 # wp-harden-htaccess.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Writes a hardened .htaccess into every WordPress install under
 # /home/<user>/public_html[/wordpress] - plus a second one in
 # wp-content/uploads/ that prevents execution of uploaded scripts.
@@ -53,7 +56,7 @@ while [[ $# -gt 0 ]]; do
     --strict)           STRICT=1; shift ;;
     --no-xmlrpc-block)  BLOCK_XMLRPC=0; shift ;;
     --backup-dir)       BACKUP_DIR="$2"; shift 2 ;;
-    -h|--help)          sed -n '2,36p' "$0"; exit 0 ;;
+    -h|--help)          sed -n '2,38p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

@@ -2,6 +2,9 @@
 #
 # wp-health-check.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Functional health check across every WordPress install under
 # /home/<user>/public_html[/wordpress]. Complements the security tools:
 # wp-db-audit and wp-asset-scan ask "is anything malicious here?", this one
@@ -51,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     --only)  ONLY="$2"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
     --fix)   FIX=1; shift ;;
-    -h|--help) sed -n '2,42p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,43p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

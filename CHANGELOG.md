@@ -3,7 +3,15 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [1.1.0] — 2026-08-18
+## [1.2.0] — 2026-08-20
+
+Large release: the whole project switched to English, four scripts were added
+and several defects found during real use were fixed.
+
+> **Upgrading from 1.0.0:** script output is now English. If you parse the
+> output in your own scripts, adjust them. Wiki page names changed. Existing
+> `.htaccess` files written by 1.0.0 keep working — the old German markers are
+> still recognised.
 
 ### Changed
 
@@ -24,6 +32,9 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Added
 
+- `wp-health-check` — functional check across all sites: PHP identity,
+  filesystem method, ownership, permalinks, REST API (both ways), uploads
+  execution, media delivery, home page, cron backlog
 - `wp-fix-ownership` — check file ownership and fix it interactively
 - `wp-harden-htaccess` — roll out a hardened `.htaccess`, with inventory,
   classification of carried-over rules and automatic rollback
@@ -82,5 +93,5 @@ against actual findings **and** against legitimate counter-examples.
   explicitly marked as unverified.
 - The path assumption is `/home/<user>/public_html[/wordpress]`.
 
-[1.1.0]: https://github.com/mradeka/wp-redirect-toolkit/compare/v1.0.0...v1.1.0
+[1.2.0]: https://github.com/mradeka/wp-redirect-toolkit/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/mradeka/wp-redirect-toolkit/releases/tag/v1.0.0

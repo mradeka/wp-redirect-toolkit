@@ -2,6 +2,9 @@
 #
 # wp-move-to-subdir.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Moves a WordPress install from /home/SITE/public_html into
 # /home/SITE/public_html/wordpress, using WordPress's own supported
 # "Giving WordPress its own directory" layout:

@@ -2,6 +2,9 @@
 #
 # wp-db-audit.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Read-only audit of what lives in the DATABASE and in the WordPress
 # configuration of every install under /home/*/public_html.
 #
@@ -38,7 +41,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --only)  ONLY="$2"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
-    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done

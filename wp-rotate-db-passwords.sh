@@ -2,6 +2,9 @@
 #
 # wp-rotate-db-passwords.sh
 #
+# Part of wp-redirect-toolkit 1.2.0
+# https://github.com/mradeka/wp-redirect-toolkit
+#
 # Generates a new MySQL password for every WordPress install under
 # /home/<user>/public_html[/wordpress], changes it in MySQL, writes it into
 # wp-config.php, verifies the site can still reach its database, and records
@@ -43,7 +46,7 @@ while [[ $# -gt 0 ]]; do
     --length)   LENGTH="$2"; shift 2 ;;
     --credfile) CREDFILE="$2"; shift 2 ;;
     --defaults-file) MYSQL_OPTS="--defaults-file=$2"; shift 2 ;;
-    -h|--help)  sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,32p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
