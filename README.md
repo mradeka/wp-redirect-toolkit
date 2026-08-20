@@ -33,6 +33,7 @@ given. A backup is taken before any change.
 | [`wp-cleanup-all`](#wp-cleanup-all) | Run the cleanup across all sites | only `--apply` | root |
 | [`wp-rotate-db-passwords`](#wp-rotate-db-passwords) | Rotate database passwords | only `--apply` | root |
 | [`wp-fix-ownership`](#wp-fix-ownership) | Check file ownership, fix interactively | only after selection | root |
+| [`wp-health-check`](#wp-health-check) | Functional check: does everything still work? | only with `--fix` | root |
 | [`wp-harden-htaccess`](#wp-harden-htaccess) | Roll out a hardened `.htaccess` | only `--apply` | root |
 | [`wp-move-to-subdir`](#wp-move-to-subdir) | Move an install into `public_html/wordpress/` | only `--apply` | root |
 | [`apply-blocklist`](#apply-blocklist) | Block or search the campaign's domains | only `--apply` | root |
@@ -457,6 +458,41 @@ Aguilar (WPSecurityAnalyzer) in May 2026 for the same campaign
 > addresses that change and are shared with thousands of legitimate sites — an
 > IP rule hits far too much and works only briefly. Also check `ushort.com`
 > separately: short generic domains change hands.
+
+### wp-health-check
+
+The security tools ask "is anything malicious here?". This one asks **"does
+everything still work?"** — every check exists because that failure actually
+happened, and because the symptom pointed somewhere other than the cause.
+
+```bash
+sudo wp-health-check                 # check every site
+sudo wp-health-check --only siteuser
+sudo wp-health-check --quiet         # failures only, for cron
+sudo wp-health-check --fix           # offer two safe repairs
+```
+
+| Check | Catches |
+|---|---|
+| php identity | `mod_php` overriding fcgid → PHP runs as `www-data` → uploads fail, updates ask for FTP, no debug.log |
+| update method | `get_filesystem_method()` — `ftpext` means root-owned files |
+| ownership | uploads and updates break independently |
+| permalinks | an empty `permalink_structure` means no rewrite rules → `/wp-json/` 404s → block editor fails with "response is not a valid JSON response" |
+| rest api | tested **both ways**: `/wp-json/` and `?rest_route=`. If only the second works, the rewrite rules are the problem, not WordPress |
+| uploads exec | PHP in `uploads/` must not run |
+| media delivery | …while images must still be served. A rule that blocks both is worse than no rule |
+| home/siteurl | for a subdirectory layout they differ on purpose |
+| home page, wp-cron | reachability and a cron backlog |
+
+> **All URLs are built from `siteurl`, not `home`.** With a subdirectory
+> install the asset path contains the directory — testing against `home`
+> returns a 404 that looks like protection but is just a wrong address. That
+> mistake cost real time during the incident.
+
+Exit code 0 = healthy, 1 = problems, so it fits into cron. `--fix` offers
+exactly two repairs, each with a prompt: setting a permalink structure (it
+warns that every URL changes) and discarding theme cache files written under a
+foreign identity.
 
 ### check-usrlocalbin-access
 
