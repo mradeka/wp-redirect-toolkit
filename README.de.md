@@ -692,4 +692,4 @@ Aktuelle Fassung: **1.2.0** — siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Lizenz
 
-MIT
+GPL-3.0 — siehe [LICENSE](LICENSE).
