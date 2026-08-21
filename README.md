@@ -1,7 +1,7 @@
 # wp-redirect-toolkit
 
 [![shellcheck](https://github.com/mradeka/wp-redirect-toolkit/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/mradeka/wp-redirect-toolkit/actions/workflows/shellcheck.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
 🇩🇪 [Deutsche Fassung](README.de.md)
 
@@ -585,4 +585,4 @@ Current release: **1.2.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT
+GPL-3.0 — see [LICENSE](LICENSE).
